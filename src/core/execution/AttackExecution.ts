@@ -16,8 +16,6 @@ import { renderTroops } from "../../client/Utils";
 
 const malusForRetreat = 25;
 export class AttackExecution implements Execution {
-  private breakAlliance = false;
-  private wasAlliedAtInit = false; // Store alliance state at initialization
   private active = true;
   private readonly toConquer = new FlatBinaryHeap();
 
@@ -35,7 +33,7 @@ export class AttackExecution implements Execution {
     private readonly _targetID: PlayerID | null,
     private readonly sourceTile: TileRef | null = null,
     private readonly removeTroops = true,
-  ) {}
+  ) { }
 
   public targetID(): PlayerID | null {
     return this._targetID;
@@ -51,6 +49,7 @@ export class AttackExecution implements Execution {
     }
     this.mg = mg;
 
+    // Target validation
     if (this._targetID !== null && !mg.hasPlayer(this._targetID)) {
       console.warn(`target ${this._targetID} not found`);
       this.active = false;
@@ -64,6 +63,13 @@ export class AttackExecution implements Execution {
 
     if (this._owner === this.target) {
       console.error(`Player ${this._owner} cannot attack itself`);
+      this.active = false;
+      return;
+    }
+
+    // ALLIANCE CHECK
+    if (this.target.isPlayer() && this._owner.isFriendly(this.target)) {
+      console.warn(`${this._owner.displayName()} cannot attack ${this.target.displayName()} because they are allied`);
       this.active = false;
       return;
     }
@@ -83,7 +89,7 @@ export class AttackExecution implements Execution {
     if (this.target.isPlayer()) {
       if (
         this.mg.config().numSpawnPhaseTurns() +
-          this.mg.config().spawnImmunityDuration() >
+        this.mg.config().spawnImmunityDuration() >
         this.mg.ticks()
       ) {
         console.warn("cannot attack player during immunity phase");
@@ -149,11 +155,6 @@ export class AttackExecution implements Execution {
     }
 
     if (this.target.isPlayer()) {
-      // Store the alliance state at initialization time to prevent race conditions
-      this.wasAlliedAtInit = this._owner.isAlliedWith(this.target);
-      if (this.wasAlliedAtInit) {
-        this.breakAlliance = true;
-      }
       this.target.updateRelation(this._owner, -80);
     }
   }
@@ -185,6 +186,7 @@ export class AttackExecution implements Execution {
     }
     const survivors = this.attack.troops() - deaths;
     this._owner.addTroops(survivors);
+
     this.attack.delete();
     this.active = false;
 
@@ -222,17 +224,9 @@ export class AttackExecution implements Execution {
       return;
     }
 
-    const alliance = targetPlayer
-      ? this._owner.allianceWith(targetPlayer)
-      : null;
-    if (this.breakAlliance && alliance !== null) {
-      this.breakAlliance = false;
-      this._owner.breakAlliance(alliance);
-    }
     if (
       targetPlayer &&
-      this._owner.isAlliedWith(targetPlayer) &&
-      !this.wasAlliedAtInit
+      this._owner.isFriendly(targetPlayer)
     ) {
       // In this case a new alliance was created AFTER the attack started.
       // We should retreat to avoid the attacker becoming a traitor.
