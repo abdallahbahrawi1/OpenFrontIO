@@ -227,3 +227,303 @@ describe("BotBehavior.handleAllianceExtensionRequests", () => {
     expect(mockGame.addExecution).not.toHaveBeenCalled();
   });
 });
+
+describe("BotBehavior Attack Behavior", () => {
+  let game: Game;
+  let bot: Player;
+  let human: Player;
+  let botBehavior: BotBehavior;
+
+  beforeEach(async () => {
+    game = await setup("big_plains", {
+      infiniteGold: true,
+      instantBuild: true,
+      infiniteTroops: true,
+    });
+
+    const botInfo = new PlayerInfo("bot_test", PlayerType.Bot, null, "bot_test");
+    const humanInfo = new PlayerInfo("human_test", PlayerType.Human, null, "human_test");
+
+    game.addPlayer(botInfo);
+    game.addPlayer(humanInfo);
+
+    bot = game.player("bot_test");
+    human = game.player("human_test");
+
+    // Give both players some tiles and troops
+    let tileCount = 0;
+    game.map().forEachTile((tile) => {
+      if (game.map().isLand(tile) && tileCount < 10) {
+        if (tileCount % 2 === 0) {
+          bot.conquer(tile);
+        } else {
+          human.conquer(tile);
+        }
+        tileCount++;
+      }
+    });
+
+    bot.addTroops(1000);
+    human.addTroops(1000);
+
+    const random = new PseudoRandom(42);
+    botBehavior = new BotBehavior(random, game, bot, 0.5, 0.5, 0.2);
+
+    // Skip spawn phase
+    while (game.inSpawnPhase()) {
+      game.executeNextTick();
+    }
+  });
+
+  test("bot cannot attack allied player", () => {
+    // Form alliance (bot creates request to human)
+    const allianceRequest = bot.createAllianceRequest(human);
+    allianceRequest?.accept();
+
+    expect(bot.isAlliedWith(human)).toBe(true);
+    expect(bot.isFriendly(human)).toBe(true);
+
+    // Count attacks before
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot tries to attack ally (should be blocked by your isFriendly check)
+    botBehavior.sendAttack(human);
+
+    game.executeNextTick();
+
+    // Should be same number of attacks (no new attack created)
+    expect(bot.outgoingAttacks()).toHaveLength(attacksBefore);
+  });
+
+  test("nation cannot attack allied player", () => {
+    // Create nation
+    const nationInfo = new PlayerInfo("nation_test", PlayerType.FakeHuman, null, "nation_test");
+    game.addPlayer(nationInfo);
+    const nation = game.player("nation_test");
+
+    // FIX: Give nation tiles using a different approach
+    let nationTiles = 0;
+    let tilesAssigned = 0;
+
+    game.map().forEachTile((tile) => {
+      if (game.map().isLand(tile) && tilesAssigned < 20) {
+        // Assign tiles round-robin style: bot, human, nation, bot, human, nation...
+        if (tilesAssigned % 3 === 0) {
+          bot.conquer(tile);
+        } else if (tilesAssigned % 3 === 1) {
+          human.conquer(tile);
+        } else {
+          nation.conquer(tile);
+          nationTiles++;
+        }
+        tilesAssigned++;
+      }
+    });
+
+    nation.addTroops(1000);
+
+    const nationBehavior = new BotBehavior(new PseudoRandom(42), game, nation, 0.5, 0.5, 0.2);
+
+    // Alliance between nation and human
+    const allianceRequest = nation.createAllianceRequest(human);
+    allianceRequest?.accept();
+
+    expect(nation.isAlliedWith(human)).toBe(true);
+
+    const attacksBefore = nation.outgoingAttacks().length;
+
+    // Nation tries to attack ally (should be blocked)
+    nationBehavior.sendAttack(human);
+
+    game.executeNextTick();
+
+    expect(nation.outgoingAttacks()).toHaveLength(attacksBefore);
+  });
+
+  test("bot can attack unallied player", () => {
+  // Ensure no alliance exists
+    expect(bot.isAlliedWith(human)).toBe(false);
+    expect(bot.isFriendly(human)).toBe(false);
+
+    // FIX: Use addTroops instead of setTroops
+    bot.addTroops(50000); // Add a lot of troops
+
+    console.log("Bot troops:", bot.troops());
+    console.log("Max troops:", game.config().maxTroops(bot));
+
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot should be able to attack non-ally
+    botBehavior.sendAttack(human);
+
+    game.executeNextTick();
+
+    // Should create new attack
+    expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+  });
+
+  test("bot can attack other unallied bot", () => {
+    // Create another bot
+    const bot2Info = new PlayerInfo("bot2", PlayerType.Bot, null, "bot2");
+    game.addPlayer(bot2Info);
+    const bot2 = game.player("bot2");
+
+    // Give bot2 some tiles and troops
+    let bot2Tiles = 0;
+    game.map().forEachTile((tile) => {
+      if (game.map().isLand(tile) && bot2Tiles < 3) {
+        bot2.conquer(tile);
+        bot2Tiles++;
+      }
+    });
+    bot2.addTroops(1000);
+
+    // FIX: Give the attacking bot MORE troops
+    bot.addTroops(50000); // Add lots of troops to ensure attack happens
+
+    // No alliance between bots
+    expect(bot.isAlliedWith(bot2)).toBe(false);
+    expect(bot.isFriendly(bot2)).toBe(false);
+
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot should attack other bot
+    botBehavior.sendAttack(bot2);
+    game.executeNextTick();
+
+    expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+  });
+
+  test("bot can attack TerraNullius (expansion)", () => {
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot should be able to expand to neutral territory
+    botBehavior.sendAttack(game.terraNullius());
+
+    game.executeNextTick();
+
+    expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+  });
+});
+describe("Bot shouldBetrayAlly Logic", () => {
+  let game: Game;
+  let bot: Player;
+  let human: Player;
+  let botBehavior: BotBehavior;
+
+  beforeEach(async () => {
+    game = await setup("big_plains", {
+      infiniteGold: true,
+      instantBuild: true,
+      infiniteTroops: true,
+    });
+
+    const botInfo = new PlayerInfo("bot_betrayal", PlayerType.Bot, null, "bot_betrayal");
+    const humanInfo = new PlayerInfo("human_betrayal", PlayerType.Human, null, "human_betrayal");
+
+    game.addPlayer(botInfo);
+    game.addPlayer(humanInfo);
+
+    bot = game.player("bot_betrayal");
+    human = game.player("human_betrayal");
+
+    // Give both players some tiles and troops
+    let tileCount = 0;
+    game.map().forEachTile((tile) => {
+      if (game.map().isLand(tile) && tileCount < 10) {
+        if (tileCount % 2 === 0) {
+          bot.conquer(tile);
+        } else {
+          human.conquer(tile);
+        }
+        tileCount++;
+      }
+    });
+
+    bot.addTroops(50000); // Much higher troop count to ensure attacks
+    human.addTroops(1000);
+
+    const random = new PseudoRandom(42);
+    botBehavior = new BotBehavior(random, game, bot, 0.5, 0.5, 0.2);
+
+    // Skip spawn phase
+    while (game.inSpawnPhase()) {
+      game.executeNextTick();
+    }
+  });
+
+  test("bot betrays ally when relationship becomes hostile", () => {
+    // Form alliance
+    const allianceRequest = bot.createAllianceRequest(human);
+    allianceRequest?.accept();
+    expect(bot.isAlliedWith(human)).toBe(true);
+
+    // Relationship deteriorates to hostile (below Neutral)
+    human.updateRelation(bot, -100); // Make hostile from human's side
+    bot.updateRelation(human, -100); // Make hostile from bot's side
+
+    // Verify relationship is hostile
+    expect(bot.relation(human) < Relation.Neutral).toBe(true);
+
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot should betray and attack
+    botBehavior.sendAttack(human);
+    game.executeNextTick();
+
+    // Alliance should be broken and attack created
+    expect(bot.isAlliedWith(human)).toBe(false);
+    expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+    expect(bot.isTraitor()).toBe(true);
+  });
+
+  test("bot betrays ally who becomes traitor", () => {
+    // Form alliance
+    const allianceRequest = bot.createAllianceRequest(human);
+    allianceRequest?.accept();
+    expect(bot.isAlliedWith(human)).toBe(true);
+
+    // Human becomes traitor
+    human.markTraitor();
+    expect(human.isTraitor()).toBe(true);
+
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot should betray traitor ally
+    botBehavior.sendAttack(human);
+    game.executeNextTick();
+
+    expect(bot.isAlliedWith(human)).toBe(false);
+    expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+    expect(bot.isTraitor()).toBe(false); // Bot not traitor for betraying traitor
+  });
+
+  test("bot honors alliance with good ally", () => {
+    // Form alliance
+    const allianceRequest = bot.createAllianceRequest(human);
+    allianceRequest?.accept();
+    expect(bot.isAlliedWith(human)).toBe(true);
+
+    // Keep good relationship (don't make hostile)
+    bot.updateRelation(human, 50); // Friendly
+
+    // Human is not a traitor
+    expect(human.isTraitor()).toBe(false);
+
+    // Human doesn't have too many alliances
+    expect(human.alliances().length).toBeLessThan(4);
+
+    // Power levels are reasonable (bot not 3x stronger)
+    expect(bot.numTilesOwned()).toBeLessThan(human.numTilesOwned() * 3);
+
+    const attacksBefore = bot.outgoingAttacks().length;
+
+    // Bot should honor alliance
+    botBehavior.sendAttack(human);
+    game.executeNextTick();
+
+    // Alliance should remain intact, no attack created
+    expect(bot.isAlliedWith(human)).toBe(true);
+    expect(bot.outgoingAttacks()).toHaveLength(attacksBefore);
+  });
+});

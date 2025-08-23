@@ -17,6 +17,30 @@ export class BotBehavior {
   private enemy: Player | null = null;
   private enemyUpdated: Tick;
 
+  private shouldBetrayAlly(ally: Player): boolean {
+    if (this.player.relation(ally) < Relation.Neutral) {
+      return true; // Betray if relationship became hostile
+    }
+
+    if (ally.isTraitor()) {
+      return true; // Always betray traitors
+    }
+
+    // Originally accepted if ally was 3x larger, now betray if WE become much larger
+    if (this.player.numTilesOwned() > ally.numTilesOwned() * 3) {
+      return true;
+    }
+
+    if (ally.alliances().length >= 4) {
+      return true; // Betray if ally has too many allies (unreliable)
+    }
+
+    if (ally.troops() < this.player.troops() * 0.3) {
+      return true; // Betray weak allies
+    }
+    return false; // Honor alliance otherwise
+  }
+
   private readonly assistAcceptEmoji = flattenedEmojiTable.indexOf("👍");
 
   constructor(
@@ -231,7 +255,23 @@ export class BotBehavior {
 
   sendAttack(target: Player | TerraNullius) {
     // Fix: Use isFriendly instead of just isOnSameTeam
-    if (target.isPlayer() && this.player.isFriendly(target)) return;
+    if (target.isPlayer() && this.player.isOnSameTeam(target)) return;
+
+    if (target.isPlayer() && this.player.isAlliedWith(target)) {
+    // Check if bot should betray this ally
+      if (this.shouldBetrayAlly(target)) {
+        // Break alliance first, then attack
+        const alliance = this.player.allianceWith(target);
+        if (alliance) {
+          this.player.breakAlliance(alliance);
+          console.log(`${this.player.displayName()} betrays ${target.displayName()}!`);
+        }
+        // Continue with attack after betrayal
+      } else {
+        return; // Honor alliance
+      }
+    }
+
     const maxTroops = this.game.config().maxTroops(this.player);
     const reserveRatio = target.isPlayer()
       ? this.reserveRatio
