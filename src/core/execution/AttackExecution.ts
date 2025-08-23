@@ -69,7 +69,11 @@ export class AttackExecution implements Execution {
 
     // ALLIANCE CHECK
     if (this.target.isPlayer() && this._owner.isFriendly(this.target)) {
-      console.warn(`${this._owner.displayName()} cannot attack ${this.target.displayName()} because they are allied`);
+      console.warn(
+        `${this._owner.displayName()} cannot attack ${this.target.displayName()} `
+        + "because they are friendly (allied or same team)",
+      );
+
       this.active = false;
       return;
     }

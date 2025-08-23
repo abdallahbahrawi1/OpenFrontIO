@@ -291,6 +291,7 @@ describe("BotBehavior Attack Behavior", () => {
 
     game.executeNextTick();
 
+    expect(human.incomingAttacks()).toHaveLength(0);
     // Should be same number of attacks (no new attack created)
     expect(bot.outgoingAttacks()).toHaveLength(attacksBefore);
   });
@@ -301,8 +302,6 @@ describe("BotBehavior Attack Behavior", () => {
     game.addPlayer(nationInfo);
     const nation = game.player("nation_test");
 
-    // FIX: Give nation tiles using a different approach
-    let nationTiles = 0;
     let tilesAssigned = 0;
 
     game.map().forEachTile((tile) => {
@@ -314,7 +313,6 @@ describe("BotBehavior Attack Behavior", () => {
           human.conquer(tile);
         } else {
           nation.conquer(tile);
-          nationTiles++;
         }
         tilesAssigned++;
       }
@@ -347,9 +345,6 @@ describe("BotBehavior Attack Behavior", () => {
 
     // FIX: Use addTroops instead of setTroops
     bot.addTroops(50000); // Add a lot of troops
-
-    console.log("Bot troops:", bot.troops());
-    console.log("Max troops:", game.config().maxTroops(bot));
 
     const attacksBefore = bot.outgoingAttacks().length;
 

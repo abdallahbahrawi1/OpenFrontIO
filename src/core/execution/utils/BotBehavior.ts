@@ -18,7 +18,12 @@ export class BotBehavior {
   private enemyUpdated: Tick;
 
   private shouldBetrayAlly(ally: Player): boolean {
-    if (this.player.relation(ally) < Relation.Neutral) {
+    const POWER_IMBALANCE_RATIO = 3;
+    const ALLIANCE_OVEREXTENSION = 4;
+    const WEAK_TROOP_RATIO = 0.3;
+
+    const rel = this.player.relation(ally);
+    if (rel < Relation.Neutral) {
       return true; // Betray if relationship became hostile
     }
 
@@ -27,15 +32,15 @@ export class BotBehavior {
     }
 
     // Originally accepted if ally was 3x larger, now betray if WE become much larger
-    if (this.player.numTilesOwned() > ally.numTilesOwned() * 3) {
+    if (this.player.numTilesOwned() > ally.numTilesOwned() * POWER_IMBALANCE_RATIO) {
       return true;
     }
 
-    if (ally.alliances().length >= 4) {
+    if (ally.alliances().length >= ALLIANCE_OVEREXTENSION) {
       return true; // Betray if ally has too many allies (unreliable)
     }
 
-    if (ally.troops() < this.player.troops() * 0.3) {
+    if (ally.troops() < this.player.troops() * WEAK_TROOP_RATIO) {
       return true; // Betray weak allies
     }
     return false; // Honor alliance otherwise
@@ -264,7 +269,6 @@ export class BotBehavior {
         const alliance = this.player.allianceWith(target);
         if (alliance) {
           this.player.breakAlliance(alliance);
-          console.log(`${this.player.displayName()} betrays ${target.displayName()}!`);
         }
         // Continue with attack after betrayal
       } else {
@@ -283,7 +287,7 @@ export class BotBehavior {
       new AttackExecution(
         troops,
         this.player,
-        target.isPlayer() ? target.id() : null,
+        target.isPlayer() ? target.id() : this.game.terraNullius().id(),
       ),
     );
   }

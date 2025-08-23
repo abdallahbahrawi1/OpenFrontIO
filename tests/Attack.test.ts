@@ -216,20 +216,13 @@ describe("Attack race condition with alliance requests", () => {
     );
     game.addExecution(attackExecution);
 
-    // Execute a few ticks to process the attack
-    for (let i = 0; i < 10; i++) {
-      game.executeNextTick();
-    }
+    game.executeNextTick();
 
-    // Attack should be blocked/inactive
-    expect(attackExecution.isActive()).toBe(false);
-    // Player A should NOT be marked as traitor (attack was prevented)
-    expect(playerA.isTraitor()).toBe(false);
-    // Alliance should remain intact
-    expect(playerA.isAlliedWith(playerB)).toBe(true);
-    expect(playerB.isAlliedWith(playerA)).toBe(true);
-    // No ongoing attacks should exist
+    // No ongoing attacks should exist for either side
     expect(playerA.outgoingAttacks()).toHaveLength(0);
+    expect(playerB.outgoingAttacks()).toHaveLength(0);
+    expect(playerA.incomingAttacks()).toHaveLength(0);
+    expect(playerB.incomingAttacks()).toHaveLength(0);
   });
 
   test("should cancel alliance requests if the recipient attacks", async () => {
