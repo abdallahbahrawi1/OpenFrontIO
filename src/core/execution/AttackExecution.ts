@@ -21,9 +21,9 @@ export class AttackExecution implements Execution {
 
   private readonly random = new PseudoRandom(123);
 
-  private target: Player | TerraNullius;
+  private target: Player | TerraNullius | undefined;
 
-  private mg: Game;
+  private mg: Game | undefined;
 
   private attack: Attack | null = null;
 
@@ -176,6 +176,9 @@ export class AttackExecution implements Execution {
   }
 
   private retreat(malusPercent = 0) {
+    if (this.mg === undefined) {
+      throw new Error("Attack not initialized");
+    }
     if (this.attack === null) {
       throw new Error("Attack not initialized");
     }
@@ -195,22 +198,27 @@ export class AttackExecution implements Execution {
     this.active = false;
 
     // Not all retreats are canceled attacks
-    if (this.attack.retreated()) {
+    if (this.attack.retreated() && this.target && this.target.isPlayer()) {
       // Record stats
       this.mg.stats().attackCancel(this._owner, this.target, survivors);
     }
   }
 
   tick(ticks: number) {
+    if (this.mg === undefined) {
+      throw new Error("Attack not initialized");
+    }
+    if (this.target === undefined) {
+      throw new Error("Attack not initialized");
+    }
     if (this.attack === null) {
       throw new Error("Attack not initialized");
     }
     let troopCount = this.attack.troops(); // cache troop count
-    const targetIsPlayer = this.target.isPlayer(); // cache target type
-    const targetPlayer = targetIsPlayer ? (this.target as Player) : null; // cache target player
+    const targetPlayer: Player | null = this.target.isPlayer() ? this.target : null; // cache target player
 
     if (this.attack.retreated()) {
-      if (targetIsPlayer) {
+      if (targetPlayer !== null) {
         this.retreat(malusForRetreat);
       } else {
         this.retreat();
@@ -307,6 +315,9 @@ export class AttackExecution implements Execution {
     if (this.attack === null) {
       throw new Error("Attack not initialized");
     }
+    if (this.mg === undefined) {
+      throw new Error("Attack not initialized");
+    }
 
     const tickNow = this.mg.ticks(); // cache tick
 
@@ -347,6 +358,8 @@ export class AttackExecution implements Execution {
   }
 
   private handleDeadDefender() {
+    if (!this.mg) return;
+    if (!this.target) return;
     if (!(this.target.isPlayer() && this.target.numTilesOwned() < 100)) return;
 
     this.mg.conquerPlayer(this._owner, this.target);
@@ -355,7 +368,7 @@ export class AttackExecution implements Execution {
       for (const tile of this.target.tiles()) {
         const borders = this.mg
           .neighbors(tile)
-          .some((t) => this.mg.owner(t) === this._owner);
+          .some((t) => this.mg?.owner(t) === this._owner);
         if (borders) {
           this._owner.conquer(tile);
         } else {
