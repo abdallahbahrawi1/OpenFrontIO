@@ -234,6 +234,28 @@ describe("BotBehavior Attack Behavior", () => {
   let human: Player;
   let botBehavior: BotBehavior;
 
+  // Helper functions for tile assignment
+  function assignAlternatingLandTiles(game: Game, players: Player[], totalTiles: number) {
+    let assigned = 0;
+    game.map().forEachTile((tile) => {
+      if (assigned >= totalTiles) return;
+      if (!game.map().isLand(tile)) return;
+      const player = players[assigned % players.length];
+      player.conquer(tile);
+      assigned++;
+    });
+  }
+
+  function assignNLandTiles(game: Game, player: Player, count: number) {
+    let assigned = 0;
+    game.map().forEachTile((tile) => {
+      if (assigned >= count) return;
+      if (!game.map().isLand(tile)) return;
+      player.conquer(tile);
+      assigned++;
+    });
+  }
+
   beforeEach(async () => {
     game = await setup("big_plains", {
       infiniteGold: true,
@@ -251,17 +273,7 @@ describe("BotBehavior Attack Behavior", () => {
     human = game.player("human_test");
 
     // Give both players some tiles and troops
-    let tileCount = 0;
-    game.map().forEachTile((tile) => {
-      if (game.map().isLand(tile) && tileCount < 10) {
-        if (tileCount % 2 === 0) {
-          bot.conquer(tile);
-        } else {
-          human.conquer(tile);
-        }
-        tileCount++;
-      }
-    });
+    assignAlternatingLandTiles(game, [bot, human], 10);
 
     bot.addTroops(1000);
     human.addTroops(1000);
@@ -287,12 +299,17 @@ describe("BotBehavior Attack Behavior", () => {
 
     // Count attacks before
     const attacksBefore = bot.outgoingAttacks().length;
+    // Ensure troop gate isn't the reason this test passes
+    bot.addTroops(50_000);
 
     // Bot tries to attack ally (should be blocked by your isFriendly check)
     botBehavior.sendAttack(human);
 
     game.executeNextTick();
 
+    // Alliance should remain intact (no silent break)
+    expect(bot.isAlliedWith(human)).toBe(true);
+    expect(bot.isFriendly(human)).toBe(true);
     expect(human.incomingAttacks()).toHaveLength(0);
     // Should be same number of attacks (no new attack created)
     expect(bot.outgoingAttacks()).toHaveLength(attacksBefore);
@@ -304,21 +321,8 @@ describe("BotBehavior Attack Behavior", () => {
     game.addPlayer(nationInfo);
     const nation = game.player("nation_test");
 
-    let tilesAssigned = 0;
-
-    game.map().forEachTile((tile) => {
-      if (game.map().isLand(tile) && tilesAssigned < 20) {
-        // Assign tiles round-robin style: bot, human, nation, bot, human, nation...
-        if (tilesAssigned % 3 === 0) {
-          bot.conquer(tile);
-        } else if (tilesAssigned % 3 === 1) {
-          human.conquer(tile);
-        } else {
-          nation.conquer(tile);
-        }
-        tilesAssigned++;
-      }
-    });
+    // Use helper for tile assignment
+    assignAlternatingLandTiles(game, [bot, human, nation], 21); // 21 to ensure each gets 7 tiles
 
     nation.addTroops(1000);
 
@@ -329,8 +333,11 @@ describe("BotBehavior Attack Behavior", () => {
     allianceRequest?.accept();
 
     expect(nation.isAlliedWith(human)).toBe(true);
+    expect(nation.isFriendly(human)).toBe(true);
 
     const attacksBefore = nation.outgoingAttacks().length;
+    // Ensure troop gate isn't the reason this test passes
+    nation.addTroops(50_000);
 
     // Nation tries to attack ally (should be blocked)
     nationBehavior.sendAttack(human);
@@ -338,6 +345,7 @@ describe("BotBehavior Attack Behavior", () => {
     game.executeNextTick();
 
     expect(nation.isAlliedWith(human)).toBe(true);
+    expect(nation.isFriendly(human)).toBe(true);
     expect(nation.outgoingAttacks()).toHaveLength(attacksBefore);
   });
 
@@ -346,8 +354,7 @@ describe("BotBehavior Attack Behavior", () => {
     expect(bot.isAlliedWith(human)).toBe(false);
     expect(bot.isFriendly(human)).toBe(false);
 
-    // FIX: Use addTroops instead of setTroops
-    bot.addTroops(50000); // Add a lot of troops
+    bot.addTroops(50_000); // Add a lot of troops
 
     const attacksBefore = bot.outgoingAttacks().length;
 
@@ -359,6 +366,8 @@ describe("BotBehavior Attack Behavior", () => {
     // Should create new attack
     expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
     expect(human.incomingAttacks().length).toBeGreaterThan(0);
+    const hasHumanTarget = bot.outgoingAttacks().some((a) => a.target() === human);
+    expect(hasHumanTarget).toBe(true);
   });
 
   test("bot can attack other unallied bot", () => {
@@ -368,17 +377,10 @@ describe("BotBehavior Attack Behavior", () => {
     const bot2 = game.player("bot2");
 
     // Give bot2 some tiles and troops
-    let bot2Tiles = 0;
-    game.map().forEachTile((tile) => {
-      if (game.map().isLand(tile) && bot2Tiles < 3) {
-        bot2.conquer(tile);
-        bot2Tiles++;
-      }
-    });
+    assignNLandTiles(game, bot2, 3);
     bot2.addTroops(1000);
 
-    // FIX: Give the attacking bot MORE troops
-    bot.addTroops(50000); // Add lots of troops to ensure attack happens
+    bot.addTroops(50_000); // Add lots of troops to ensure attack happens
 
     // No alliance between bots
     expect(bot.isAlliedWith(bot2)).toBe(false);
@@ -392,6 +394,8 @@ describe("BotBehavior Attack Behavior", () => {
 
     expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
     expect(bot2.incomingAttacks().length).toBeGreaterThan(0);
+    const hasBot2Target = bot.outgoingAttacks().some((a) => a.target() === bot2);
+    expect(hasBot2Target).toBe(true);
   });
 
   test("bot can attack TerraNullius (expansion)", () => {
