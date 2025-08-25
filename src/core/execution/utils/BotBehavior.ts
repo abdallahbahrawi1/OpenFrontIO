@@ -231,7 +231,7 @@ export class BotBehavior {
   }
 
   sendAttack(target: Player | TerraNullius) {
-    //Skip attacking friendly targets (allies or teammates) - decision to break alliances should be made by caller
+    // Skip attacking friendly targets (allies or teammates) - decision to break alliances should be made by caller
     if (target.isPlayer() && this.player.isFriendly(target)) return;
 
     const maxTroops = this.game.config().maxTroops(this.player);
