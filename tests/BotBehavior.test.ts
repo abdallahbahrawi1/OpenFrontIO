@@ -270,9 +270,11 @@ describe("BotBehavior Attack Behavior", () => {
     botBehavior = new BotBehavior(random, game, bot, 0.5, 0.5, 0.2);
 
     // Skip spawn phase
-    while (game.inSpawnPhase()) {
+    let safety = 10_000;
+    while (game.inSpawnPhase() && safety-- > 0) {
       game.executeNextTick();
     }
+    expect(safety).toBeGreaterThan(0); // sanity: spawn ended
   });
 
   test("bot cannot attack allied player", () => {
@@ -335,6 +337,7 @@ describe("BotBehavior Attack Behavior", () => {
 
     game.executeNextTick();
 
+    expect(nation.isAlliedWith(human)).toBe(true);
     expect(nation.outgoingAttacks()).toHaveLength(attacksBefore);
   });
 
@@ -355,6 +358,7 @@ describe("BotBehavior Attack Behavior", () => {
 
     // Should create new attack
     expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+    expect(human.incomingAttacks().length).toBeGreaterThan(0);
   });
 
   test("bot can attack other unallied bot", () => {
@@ -387,6 +391,7 @@ describe("BotBehavior Attack Behavior", () => {
     game.executeNextTick();
 
     expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+    expect(bot2.incomingAttacks().length).toBeGreaterThan(0);
   });
 
   test("bot can attack TerraNullius (expansion)", () => {
@@ -398,5 +403,8 @@ describe("BotBehavior Attack Behavior", () => {
     game.executeNextTick();
 
     expect(bot.outgoingAttacks().length).toBeGreaterThan(attacksBefore);
+    const tn = game.terraNullius();
+    const hasTNTarget = bot.outgoingAttacks().some((a) => a.target() === tn);
+    expect(hasTNTarget).toBe(true);
   });
 });

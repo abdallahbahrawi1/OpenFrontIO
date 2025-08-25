@@ -26,7 +26,7 @@ export class BotBehavior {
     private readonly triggerRatio: number,
     private readonly reserveRatio: number,
     private readonly expandRatio: number,
-  ) {}
+  ) { }
 
   handleAllianceRequests() {
     for (const req of this.player.incomingAllianceRequests()) {
@@ -230,16 +230,8 @@ export class BotBehavior {
   }
 
   sendAttack(target: Player | TerraNullius) {
-    // Fix: Use isFriendly instead of just isOnSameTeam
-    if (target.isPlayer() && this.player.isOnSameTeam(target)) return;
-
-    if (target.isPlayer() && this.player.isAlliedWith(target)) {
-      // Break alliance first, then attack
-      const alliance = this.player.allianceWith(target);
-      if (alliance) {
-        this.player.breakAlliance(alliance);
-      }
-    }
+    //Skip attacking friendly targets (allies or teammates) - decision to break alliances should be made by caller
+    if (target.isPlayer() && this.player.isFriendly(target)) return;
 
     const maxTroops = this.game.config().maxTroops(this.player);
     const reserveRatio = target.isPlayer()
