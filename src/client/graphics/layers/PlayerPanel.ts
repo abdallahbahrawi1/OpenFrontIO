@@ -44,6 +44,7 @@ import { UIState } from "../UIState";
 import { ChatModal } from "./ChatModal";
 import { EmojiTable } from "./EmojiTable";
 import { Layer } from "./Layer";
+import "./SendTroopsModal";
 
 @customElement("player-panel")
 export class PlayerPanel extends LitElement implements Layer {
