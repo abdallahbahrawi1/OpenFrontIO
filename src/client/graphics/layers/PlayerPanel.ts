@@ -752,6 +752,13 @@ export class PlayerPanel extends LitElement implements Layer {
     const myGoldNum = Number(myGoldRaw);
     const myTroopsNum = Number(my?.troops?.() ?? 0);
 
+    const myGoldRaw =
+      typeof (myPlayer as any)?.gold === "function"
+        ? (myPlayer as any).gold()
+        : 0n;
+    const myGoldNum = Number(myGoldRaw);
+    const myTroopsNum = Number(myPlayer?.troops?.() ?? 0);
+
     return html`
       <style>
         /* Soft glowing ring animation for traitors */
