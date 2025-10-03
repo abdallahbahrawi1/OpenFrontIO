@@ -1,16 +1,12 @@
 import { LitElement, html } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
-import randomMap from "../../resources/images/RandomMap.webp";
+import { customElement, state } from "lit/decorators.js";
 import { translateText } from "../client/Utils";
 import {
   Difficulty,
-  Duos,
   GameMapSize,
   GameMapType,
   GameMode,
   GameType,
-  Quads,
-  Trios,
   UnitType,
   mapCategories,
 } from "../core/game/Game";
@@ -29,10 +25,6 @@ import { renderUnitTypeOptions } from "./utilities/RenderUnitTypeOptions";
 
 @customElement("single-player-modal")
 export class SinglePlayerModal extends LitElement {
-  @query("o-modal") private modalEl!: HTMLElement & {
-    open: () => void;
-    close: () => void;
-  };
   @state() private selectedMap: GameMapType = GameMapType.World;
   @state() private selectedDifficulty: Difficulty = Difficulty.Medium;
   @state() private disableNPCs: boolean = false;
@@ -44,6 +36,9 @@ export class SinglePlayerModal extends LitElement {
   @state() private useRandomMap: boolean = false;
   @state() private gameMode: GameMode = GameMode.FFA;
   @state() private teamCount: TeamCountConfig = 2;
+
+  @state() private mapSearchQuery: string = "";
+  @state() private mapFilter: string = "all";
 
   @state() private disabledUnits: UnitType[] = [];
 
@@ -66,282 +61,494 @@ export class SinglePlayerModal extends LitElement {
     }
   };
 
+  private resetSettings() {
+    this.selectedMap = GameMapType.World;
+    this.selectedDifficulty = Difficulty.Medium;
+    this.disableNPCs = false;
+    this.bots = 400;
+    this.infiniteGold = false;
+    this.infiniteTroops = false;
+    this.compactMap = false;
+    this.instantBuild = false;
+    this.useRandomMap = false;
+    this.gameMode = GameMode.FFA;
+    this.teamCount = 2;
+    this.disabledUnits = [];
+    this.mapSearchQuery = "";
+    this.mapFilter = "all";
+  }
+
   render() {
     return html`
-      <o-modal title=${translateText("single_modal.title")}>
-        <div class="options-layout">
-          <!-- Map Selection -->
-          <div class="options-section">
-            <div class="option-title">${translateText("map.map")}</div>
-            <div class="option-cards flex-col">
-              <!-- Use the imported mapCategories -->
-              ${Object.entries(mapCategories).map(
-                ([categoryKey, maps]) => html`
-                  <div class="w-full mb-4">
-                    <h3
-                      class="text-lg font-semibold mb-2 text-center text-gray-300"
-                    >
-                      ${translateText(`map_categories.${categoryKey}`)}
-                    </h3>
-                    <div class="flex flex-row flex-wrap justify-center gap-4">
-                      ${maps.map((mapValue) => {
-                        const mapKey = Object.keys(GameMapType).find(
-                          (key) =>
-                            GameMapType[key as keyof typeof GameMapType] ===
-                            mapValue,
-                        );
-                        return html`
-                          <div
-                            @click=${() => this.handleMapSelection(mapValue)}
-                          >
-                            <map-display
-                              .mapKey=${mapKey}
-                              .selected=${!this.useRandomMap &&
-                              this.selectedMap === mapValue}
-                              .translation=${translateText(
-                                `map.${mapKey?.toLowerCase()}`,
-                              )}
-                            ></map-display>
-                          </div>
-                        `;
-                      })}
-                    </div>
-                  </div>
-                `,
-              )}
-              <div
-                class="option-card random-map ${this.useRandomMap
-                  ? "selected"
-                  : ""}"
-                @click=${this.handleRandomMapToggle}
+      <div
+        class="fixed inset-0 z-50"
+        role="dialog"
+        aria-labelledby="sp-title"
+        aria-modal="true"
+      >
+        <!-- fancy background -->
+        <div
+          class="pointer-events-none fixed inset-0 bg-[radial-gradient(1200px_600px_at_60%_-10%,rgba(59,130,246,0.18),transparent),radial-gradient(900px_500px_at_15%_110%,rgba(59,130,246,0.10),transparent)]"
+        ></div>
+
+        <!-- modal surface -->
+        <section
+          class="fixed inset-4 mx-auto flex max-w-[1200px] min-h-[560px] flex-col rounded-2xl border border-white/15 bg-zinc-900/80 backdrop-blur-xl shadow-[0_14px_40px_rgba(0,0,0,0.45)] md:inset-8"
+        >
+          <!-- header -->
+          <header
+            class="sticky top-0 z-10 flex items-center justify-between border-b border-white/15 bg-gradient-to-b from-zinc-900/95 to-zinc-900/70 px-4 py-3 backdrop-blur"
+          >
+            <h1
+              id="sp-title"
+              class="m-0 text-[18px] font-bold tracking-tight text-zinc-100"
+            >
+              ${translateText("single_modal.title")}
+            </h1>
+            <div class="flex gap-2">
+              <button
+                id="quickStartHeader"
+                class="h-11 min-w-11 rounded-xl border border-blue-400/40 bg-blue-500/15 px-3 text-blue-50 hover:bg-blue-500/20"
+                title="Quick Start (Enter)"
+                @click=${this.startGame}
               >
-                <div class="option-image">
-                  <img
-                    src=${randomMap}
-                    alt="Random Map"
-                    style="width:100%; aspect-ratio: 4/2; object-fit:cover; border-radius:8px;"
+                ▶ ${translateText("single_modal.quick_start")}
+              </button>
+              <button
+                id="closeModal"
+                aria-label="Close"
+                class="h-11 min-w-11 rounded-xl border border-white/15 bg-white/5 px-3 hover:bg-white/10 hover:border-white/20 text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors"
+                @click=${this.close}
+              >
+                ✕
+              </button>
+            </div>
+          </header>
+
+          <!-- body (desktop grid) -->
+          <main
+            class="grid flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:grid-cols-[1.2fr_1fr]"
+          >
+            <!-- Maps pane (desktop) -->
+            <aside
+              aria-label="Map Browser"
+              class="min-h-80 flex-col overflow-hidden rounded-xl border border-white/15 bg-zinc-900/40 flex"
+            >
+              <div class="flex flex-col gap-2 border-b border-white/10 p-3">
+                <div class="w-full">
+                  <input
+                    id="mapSearch"
+                    type="search"
+                    placeholder="${translateText("common.search")}"
+                    aria-label="Search maps"
+                    class="h-11 w-full rounded-xl border border-white/15 bg-zinc-900/60 px-3 text-zinc-100 placeholder:text-zinc-400 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 transition-colors"
+                    .value=${this.mapSearchQuery}
+                    @input=${(e: InputEvent) =>
+                      (this.mapSearchQuery = (
+                        e.target as HTMLInputElement
+                      ).value)}
                   />
                 </div>
-                <div class="option-card-title">
-                  ${translateText("map.random")}
+
+                <div class="flex flex-wrap gap-2">
+                  ${["all", "continental", "regional", "fantasy"].map(
+                    (f) => html`
+                      <button
+                        class=${`h-9 cursor-pointer rounded-full border px-3 transition-colors ${
+                          this.mapFilter === f
+                            ? "border-blue-400/50 bg-blue-500/25 text-blue-50"
+                            : "border-white/15 bg-white/5 text-zinc-100 hover:border-white/25"
+                        } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60`}
+                        aria-pressed=${this.mapFilter === f}
+                        @click=${() => (this.mapFilter = f)}
+                      >
+                        ${f === "all"
+                          ? translateText("common.all")
+                          : translateText(`map_categories.${f}`)}
+                      </button>
+                    `,
+                  )}
+                  <button
+                    id="randomMap"
+                    class="h-9 rounded-full border border-white/15 bg-white/5 px-3 hover:bg-white/10 hover:border-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                    title=${translateText("map.random")}
+                    @click=${this.handleRandomMapToggle}
+                  >
+                    🎲 ${translateText("map.random")}
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Difficulty Selection -->
-          <div class="options-section">
-            <div class="option-title">
-              ${translateText("difficulty.difficulty")}
-            </div>
-            <div class="option-cards">
-              ${Object.entries(Difficulty)
-                .filter(([key]) => isNaN(Number(key)))
-                .map(
-                  ([key, value]) => html`
-                    <div
-                      class="option-card ${this.selectedDifficulty === value
-                        ? "selected"
-                        : ""}"
-                      @click=${() => this.handleDifficultySelection(value)}
-                    >
-                      <difficulty-display
-                        .difficultyKey=${key}
-                      ></difficulty-display>
-                      <p class="option-card-title">
-                        ${translateText(`difficulty.${key}`)}
-                      </p>
-                    </div>
-                  `,
-                )}
-            </div>
-          </div>
-
-          <!-- Game Mode Selection -->
-          <div class="options-section">
-            <div class="option-title">${translateText("host_modal.mode")}</div>
-            <div class="option-cards">
               <div
-                class="option-card ${this.gameMode === GameMode.FFA
-                  ? "selected"
-                  : ""}"
-                @click=${() => this.handleGameModeSelection(GameMode.FFA)}
+                id="mapGrid"
+                role="listbox"
+                aria-label="Maps"
+                class="grid flex-1 grid-cols-1 gap-4 overflow-auto p-3"
               >
-                <div class="option-card-title">
-                  ${translateText("game_mode.ffa")}
-                </div>
-              </div>
-              <div
-                class="option-card ${this.gameMode === GameMode.Team
-                  ? "selected"
-                  : ""}"
-                @click=${() => this.handleGameModeSelection(GameMode.Team)}
-              >
-                <div class="option-card-title">
-                  ${translateText("game_mode.teams")}
-                </div>
-              </div>
-            </div>
-          </div>
+                ${this.mapFilter === "all"
+                  ? html`
+                      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        ${Object.entries(mapCategories).flatMap(
+                          ([_, categoryMaps]) =>
+                            Object.values(categoryMaps).map(
+                              (mapValue: GameMapType) => {
+                                const mapKey = Object.keys(GameMapType).find(
+                                  (key) =>
+                                    GameMapType[
+                                      key as keyof typeof GameMapType
+                                    ] === mapValue,
+                                );
+                                const selected =
+                                  !this.useRandomMap &&
+                                  this.selectedMap === mapValue;
 
-          ${this.gameMode === GameMode.FFA
-            ? ""
-            : html`
-                <!-- Team Count Selection -->
-                <div class="options-section">
-                  <div class="option-title">
-                    ${translateText("host_modal.team_count")}
+                                return html`
+                                  <div
+                                    @click=${() =>
+                                      this.handleMapSelection(mapValue)}
+                                    class="w-full h-full cursor-pointer"
+                                  >
+                                    <map-display
+                                      .mapKey=${mapKey}
+                                      .selected=${selected}
+                                      .translation=${translateText(
+                                        `map.${mapKey?.toLowerCase()}`,
+                                      )}
+                                    ></map-display>
+                                  </div>
+                                `;
+                              },
+                            ),
+                        )}
+                      </div>
+                    `
+                  : html`
+                      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        ${Object.entries(mapCategories)
+                          .filter(
+                            ([categoryKey]) => categoryKey === this.mapFilter,
+                          )
+                          .flatMap(([_, categoryMaps]) =>
+                            Object.values(categoryMaps).map(
+                              (mapValue: GameMapType) => {
+                                const mapKey = Object.keys(GameMapType).find(
+                                  (key) =>
+                                    GameMapType[
+                                      key as keyof typeof GameMapType
+                                    ] === mapValue,
+                                );
+                                const selected =
+                                  !this.useRandomMap &&
+                                  this.selectedMap === mapValue;
+
+                                return html`
+                                  <div
+                                    @click=${() =>
+                                      this.handleMapSelection(mapValue)}
+                                    class="w-full h-full cursor-pointer"
+                                  >
+                                    <map-display
+                                      .mapKey=${mapKey}
+                                      .selected=${selected}
+                                      .translation=${translateText(
+                                        `map.${mapKey?.toLowerCase()}`,
+                                      )}
+                                    ></map-display>
+                                  </div>
+                                `;
+                              },
+                            ),
+                          )}
+                      </div>
+                    `}
+              </div>
+            </aside>
+
+            <!-- Settings pane (desktop) -->
+            <section
+              aria-label="Settings"
+              class="min-h-80 flex-col gap-3 rounded-xl border border-white/15 bg-zinc-900/40 p-3 flex"
+            >
+              <section
+                class="rounded-xl border border-white/15 bg-white/5 p-4 md:p-5 text-zinc-100"
+              >
+                <dl class="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
+                  <div class="space-y-1">
+                    <dt class="text-xs text-zinc-300">
+                      ${translateText("map.map")}
+                    </dt>
+                    <dd class="font-semibold">
+                      ${this.useRandomMap
+                        ? translateText("map.random")
+                        : translateText(
+                            `map.${(
+                              Object.keys(GameMapType).find(
+                                (k) =>
+                                  GameMapType[k as keyof typeof GameMapType] ===
+                                  this.selectedMap,
+                              ) ?? ""
+                            ).toLowerCase()}`,
+                          )}
+                    </dd>
                   </div>
-                  <div class="option-cards">
-                    ${[2, 3, 4, 5, 6, 7, Quads, Trios, Duos].map(
-                      (o) => html`
-                        <div
-                          class="option-card ${this.teamCount === o
-                            ? "selected"
-                            : ""}"
-                          @click=${() => this.handleTeamCountSelection(o)}
+
+                  <div class="space-y-1">
+                    <dt class="text-xs text-zinc-300">
+                      ${translateText("difficulty.difficulty")}
+                    </dt>
+                    <dd class="font-semibold">
+                      ${translateText(
+                        `difficulty.${
+                          Object.keys(Difficulty).find(
+                            (k) =>
+                              Difficulty[k as keyof typeof Difficulty] ===
+                              this.selectedDifficulty,
+                          ) ?? "unknown"
+                        }`,
+                      )}
+                    </dd>
+                  </div>
+
+                  <div class="space-y-1">
+                    <dt class="text-xs text-zinc-300">
+                      ${translateText("host_modal.mode")}
+                    </dt>
+                    <dd class="font-semibold">
+                      ${this.gameMode === GameMode.FFA
+                        ? translateText("game_mode.ffa")
+                        : translateText("game_mode.teams")}
+                    </dd>
+                  </div>
+
+                  <div class="space-y-1">
+                    <dt class="text-xs text-zinc-300">
+                      ${translateText("single_modal.bots")}
+                    </dt>
+                    <dd class="font-semibold">${this.bots}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <!-- difficulty -->
+              <div>
+                <label class="mb-1 ml-0.5 block text-xs text-zinc-400">
+                  ${translateText("difficulty.difficulty")}
+                </label>
+                <div class="flex flex-wrap gap-2">
+                  ${Object.entries(Difficulty)
+                    .filter(([key]) => isNaN(Number(key)))
+                    .map(
+                      ([key, value]) => html`
+                        <button
+                          class=${`min-w-11 rounded-full border px-3 py-2 transition-colors ${
+                            this.selectedDifficulty === value
+                              ? "border-blue-400/60 bg-blue-500/25 text-blue-50"
+                              : "border-white/15 bg-white/5 hover:border-white/25"
+                          } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60`}
+                          @click=${() => this.handleDifficultySelection(value)}
                         >
-                          <div class="option-card-title">
-                            ${typeof o === "string"
-                              ? translateText(`public_lobby.teams_${o}`)
-                              : translateText(`public_lobby.teams`, { num: o })}
-                          </div>
-                        </div>
+                          ${translateText(`difficulty.${key}`)}
+                        </button>
                       `,
                     )}
-                  </div>
                 </div>
-              `}
+              </div>
 
-          <!-- Game Options -->
-          <div class="options-section">
-            <div class="option-title">
-              ${translateText("single_modal.options_title")}
-            </div>
-            <div class="option-cards">
-              <label for="bots-count" class="option-card">
+              <!-- mode -->
+              <div>
+                <label class="mb-1 ml-0.5 block text-xs text-zinc-400">
+                  ${translateText("host_modal.mode")}
+                </label>
+                <div
+                  class="inline-flex overflow-hidden rounded-xl border border-white/15"
+                >
+                  ${[GameMode.FFA, GameMode.Team].map(
+                    (mode) => html`
+                      <button
+                        class=${`h-10 px-4 transition-colors ${
+                          this.gameMode === mode
+                            ? "bg-blue-500/25 text-blue-50"
+                            : "bg-transparent hover:bg-white/5"
+                        } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60`}
+                        @click=${() => this.handleGameModeSelection(mode)}
+                      >
+                        ${mode === GameMode.FFA
+                          ? translateText("game_mode.ffa")
+                          : translateText("game_mode.teams")}
+                      </button>
+                    `,
+                  )}
+                </div>
+              </div>
+
+              <!-- bots -->
+              <div>
+                <label
+                  for="botsRange"
+                  class="mb-1 ml-0.5 block text-xs text-zinc-400"
+                >
+                  ${translateText("single_modal.bots")}:
+                  <span class="font-semibold text-zinc-200">${this.bots}</span>
+                </label>
                 <input
+                  id="botsRange"
                   type="range"
-                  id="bots-count"
                   min="0"
                   max="400"
                   step="1"
-                  @input=${this.handleBotsChange}
-                  @change=${this.handleBotsChange}
                   .value="${String(this.bots)}"
+                  @input=${this.handleBotsChange}
+                  class="w-full accent-blue-400"
                 />
-                <div class="option-card-title">
-                  <span>${translateText("single_modal.bots")}</span>${this
-                    .bots === 0
-                    ? translateText("single_modal.bots_disabled")
-                    : this.bots}
-                </div>
-              </label>
+              </div>
 
-              <label
-                for="singleplayer-modal-disable-npcs"
-                class="option-card ${this.disableNPCs ? "selected" : ""}"
+              <!-- advanced options -->
+              <details
+                class="overflow-hidden rounded-xl border border-white/15"
               >
-                <div class="checkbox-icon"></div>
-                <input
-                  type="checkbox"
-                  id="singleplayer-modal-disable-npcs"
-                  @change=${this.handleDisableNPCsChange}
-                  .checked=${this.disableNPCs}
-                />
-                <div class="option-card-title">
-                  ${translateText("single_modal.disable_nations")}
-                </div>
-              </label>
-              <label
-                for="singleplayer-modal-instant-build"
-                class="option-card ${this.instantBuild ? "selected" : ""}"
-              >
-                <div class="checkbox-icon"></div>
-                <input
-                  type="checkbox"
-                  id="singleplayer-modal-instant-build"
-                  @change=${this.handleInstantBuildChange}
-                  .checked=${this.instantBuild}
-                />
-                <div class="option-card-title">
-                  ${translateText("single_modal.instant_build")}
-                </div>
-              </label>
+                <summary
+                  class="cursor-pointer px-3 py-3 font-semibold hover:bg-white/5 transition-colors"
+                >
+                  ${translateText("single_modal.advanced_options")}
+                </summary>
+                <div class="border-t border-white/15 p-3">
+                  <div class="grid grid-cols-2 gap-2">
+                    <label
+                      class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 p-2 hover:bg-white/5 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        .checked=${this.disableNPCs}
+                        @change=${this.handleDisableNPCsChange}
+                        class="h-4 w-4"
+                      />
+                      <span
+                        >${translateText("single_modal.disable_nations")}</span
+                      >
+                    </label>
 
-              <label
-                for="singleplayer-modal-infinite-gold"
-                class="option-card ${this.infiniteGold ? "selected" : ""}"
-              >
-                <div class="checkbox-icon"></div>
-                <input
-                  type="checkbox"
-                  id="singleplayer-modal-infinite-gold"
-                  @change=${this.handleInfiniteGoldChange}
-                  .checked=${this.infiniteGold}
-                />
-                <div class="option-card-title">
-                  ${translateText("single_modal.infinite_gold")}
-                </div>
-              </label>
+                    <label
+                      class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 p-2 hover:bg-white/5 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        .checked=${this.instantBuild}
+                        @change=${this.handleInstantBuildChange}
+                        class="h-4 w-4"
+                      />
+                      <span
+                        >${translateText("single_modal.instant_build")}</span
+                      >
+                    </label>
 
-              <label
-                for="singleplayer-modal-infinite-troops"
-                class="option-card ${this.infiniteTroops ? "selected" : ""}"
-              >
-                <div class="checkbox-icon"></div>
-                <input
-                  type="checkbox"
-                  id="singleplayer-modal-infinite-troops"
-                  @change=${this.handleInfiniteTroopsChange}
-                  .checked=${this.infiniteTroops}
-                />
-                <div class="option-card-title">
-                  ${translateText("single_modal.infinite_troops")}
+                    <label
+                      class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 p-2 hover:bg-white/5 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        .checked=${this.infiniteGold}
+                        @change=${this.handleInfiniteGoldChange}
+                        class="h-4 w-4"
+                      />
+                      <span
+                        >${translateText("single_modal.infinite_gold")}</span
+                      >
+                    </label>
+
+                    <label
+                      class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 p-2 hover:bg-white/5 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        .checked=${this.infiniteTroops}
+                        @change=${this.handleInfiniteTroopsChange}
+                        class="h-4 w-4"
+                      />
+                      <span
+                        >${translateText("single_modal.infinite_troops")}</span
+                      >
+                    </label>
+
+                    <label
+                      class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 p-2 hover:bg-white/5 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        .checked=${this.compactMap}
+                        @change=${this.handleCompactMapChange}
+                        class="h-4 w-4"
+                      />
+                      <span>${translateText("single_modal.compact_map")}</span>
+                    </label>
+                  </div>
+
+                  <div class="my-2 h-px bg-white/15"></div>
+
+                  <div>
+                    <div class="mb-2 text-center text-xs text-zinc-400">
+                      ${translateText("single_modal.enables_title")}
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      ${renderUnitTypeOptions({
+                        disabledUnits: this.disabledUnits,
+                        toggleUnit: this.toggleUnit.bind(this),
+                      })}
+                    </div>
+                  </div>
                 </div>
+              </details>
+            </section>
+          </main>
+
+          <!-- footer -->
+          <footer
+            class="sticky bottom-0 flex items-center justify-between border-t border-white/15 bg-gradient-to-t from-zinc-900/95 to-zinc-900/70 px-4 py-3 backdrop-blur"
+          >
+            <div class="flex items-center gap-2">
+              <label for="presetSelect" class="text-xs text-zinc-400">
+                ${translateText("single_modal.presets")}
               </label>
-              <label
-                for="singleplayer-modal-compact-map"
-                class="option-card ${this.compactMap ? "selected" : ""}"
+              <select
+                id="presetSelect"
+                class="h-11 rounded-xl border border-white/15 bg-zinc-900/60 px-2 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 transition-colors"
+                .value=${String(this.selectedDifficulty)}
+                @change=${(e: Event) =>
+                  this.handleDifficultySelection(
+                    Number(
+                      (e.target as HTMLSelectElement).value,
+                    ) as unknown as Difficulty,
+                  )}
               >
-                <div class="checkbox-icon"></div>
-                <input
-                  type="checkbox"
-                  id="singleplayer-modal-compact-map"
-                  @change=${this.handleCompactMapChange}
-                  .checked=${this.compactMap}
-                />
-                <div class="option-card-title">
-                  ${translateText("single_modal.compact_map")}
-                </div>
-              </label>
+                ${Object.entries(Difficulty)
+                  .filter(([key]) => isNaN(Number(key)))
+                  .map(
+                    ([key, value]) => html`
+                      <option value=${value}>
+                        ${translateText(`difficulty.${key}`)}
+                      </option>
+                    `,
+                  )}
+              </select>
+              <button
+                id="resetBtn"
+                class="h-11 rounded-xl border border-white/15 bg-transparent px-3 hover:bg-white/5 hover:border-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                @click=${this.resetSettings}
+              >
+                ${translateText("single_modal.reset")}
+              </button>
             </div>
-
-            <hr
-              style="width: 100%; border-top: 1px solid #444; margin: 16px 0;"
-            />
-            <div
-              style="margin: 8px 0 12px 0; font-weight: bold; color: #ccc; text-align: center;"
-            >
-              ${translateText("single_modal.enables_title")}
+            <div>
+              <button
+                id="startGame"
+                class="h-11 rounded-xl bg-blue-500 px-4 font-bold text-white hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 transition-colors"
+                @click=${this.startGame}
+              >
+                ${translateText("single_modal.start")}
+              </button>
             </div>
-            <div
-              style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;"
-            >
-              ${renderUnitTypeOptions({
-                disabledUnits: this.disabledUnits,
-                toggleUnit: this.toggleUnit.bind(this),
-              })}
-            </div>
-          </div>
-        </div>
-
-        <o-button
-          title=${translateText("single_modal.start")}
-          @click=${this.startGame}
-          blockDesktop
-        ></o-button>
-      </o-modal>
+          </footer>
+        </section>
+      </div>
     `;
   }
 
@@ -350,12 +557,13 @@ export class SinglePlayerModal extends LitElement {
   }
 
   public open() {
-    this.modalEl?.open();
-    this.useRandomMap = false;
+    this.style.display = "block";
+    window.addEventListener("keydown", this.handleKeyDown);
   }
 
   public close() {
-    this.modalEl?.close();
+    this.style.display = "none";
+    window.removeEventListener("keydown", this.handleKeyDown);
   }
 
   private handleRandomMapToggle() {

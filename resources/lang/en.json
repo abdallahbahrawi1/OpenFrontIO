@@ -6,7 +6,9 @@
     "lang_code": "en"
   },
   "common": {
-    "close": "Close"
+    "all": "All",
+    "close": "Close",
+    "search": "Search..."
   },
   "main": {
     "title": "OpenFront (ALPHA)",
@@ -134,7 +136,11 @@
     "compact_map": "Mini Map",
     "disable_nukes": "Disable Nukes",
     "enables_title": "Enable Settings",
-    "start": "Start Game"
+    "start": "Start Game",
+    "advanced_options": "Advanced Options",
+    "quick_start": "Quick Start",
+    "presets": "Presets",
+    "reset": "Reset"
   },
   "token_login_modal": {
     "title": "Logging in...",
