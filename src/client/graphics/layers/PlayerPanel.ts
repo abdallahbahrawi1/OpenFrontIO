@@ -44,10 +44,11 @@ import { UIState } from "../UIState";
 import { ChatModal } from "./ChatModal";
 import { EmojiTable } from "./EmojiTable";
 import { Layer } from "./Layer";
-import "./SendTroopsModal";
+import "./SendResourceModal";
 
 @customElement("player-panel")
 export class PlayerPanel extends LitElement implements Layer {
+  static attackBarMode: boolean = false;
   public g: GameView;
   public eventBus: EventBus;
   public emojiTable: EmojiTable;
@@ -205,6 +206,7 @@ export class PlayerPanel extends LitElement implements Layer {
     e: CustomEvent<{ amount: number; closePanel?: boolean }>,
   ) => {
     const amount = Math.floor(Math.max(0, e.detail?.amount ?? 0));
+
     const myPlayer = this.g.myPlayer();
     const target = this.sendTarget;
     if (!myPlayer || !target || amount <= 0) return;
