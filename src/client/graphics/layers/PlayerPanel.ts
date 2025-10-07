@@ -51,21 +51,18 @@ export class PlayerPanel extends LitElement implements Layer {
   public eventBus: EventBus;
   public emojiTable: EmojiTable;
   public uiState: UIState;
+
   private actions: PlayerActions | null = null;
   private tile: TileRef | null = null;
   private _profileForPlayerId: number | null = null;
 
-  @state()
-  public isVisible: boolean = false;
-
-  @state()
-  private allianceExpiryText: string | null = null;
-
-  @state()
-  private allianceExpirySeconds: number | null = null;
-
-  @state()
-  private otherProfile: PlayerProfile | null = null;
+  @state() private sendTarget: PlayerView | null = null;
+  @state() private sendMode: "troops" | "gold" = "troops";
+  @state() private openSend = false;
+  @state() public isVisible: boolean = false;
+  @state() private allianceExpiryText: string | null = null;
+  @state() private allianceExpirySeconds: number | null = null;
+  @state() private otherProfile: PlayerProfile | null = null;
 
   private ctModal: ChatModal;
 
@@ -138,6 +135,8 @@ export class PlayerPanel extends LitElement implements Layer {
 
   public hide() {
     this.isVisible = false;
+    this.openSend = false;
+    this.sendTarget = null;
     this.requestUpdate();
   }
 
@@ -166,19 +165,25 @@ export class PlayerPanel extends LitElement implements Layer {
     this.hide();
   }
 
+  private openSendTroops(target: PlayerView) {
+    this.sendTarget = target;
+    this.sendMode = "troops";
+    this.openSend = true;
+  }
+
+  private openSendGold(target: PlayerView) {
+    this.sendTarget = target;
+    this.sendMode = "gold";
+    this.openSend = true;
+  }
+
   private handleDonateTroopClick(
     e: Event,
     myPlayer: PlayerView,
     other: PlayerView,
   ) {
     e.stopPropagation();
-    this.eventBus.emit(
-      new SendDonateTroopsIntentEvent(
-        other,
-        myPlayer.troops() * this.uiState.attackRatio,
-      ),
-    );
-    this.hide();
+    this.openSendTroops(other);
   }
 
   private handleDonateGoldClick(
@@ -187,9 +192,39 @@ export class PlayerPanel extends LitElement implements Layer {
     other: PlayerView,
   ) {
     e.stopPropagation();
-    this.eventBus.emit(new SendDonateGoldIntentEvent(other, null));
-    this.hide();
+    this.openSendGold(other);
   }
+
+  private closeSend = () => {
+    this.openSend = false;
+    this.sendTarget = null;
+  };
+
+  private confirmSend = (
+    e: CustomEvent<{ amount: number; closePanel?: boolean }>,
+  ) => {
+    const amount = Math.floor(Math.max(0, e.detail?.amount ?? 0));
+    const myPlayer = this.g.myPlayer();
+    const target = this.sendTarget;
+    if (!myPlayer || !target || amount <= 0) return;
+
+    if (this.sendMode === "troops") {
+      const myTroops = Number(myPlayer.troops?.() ?? 0);
+      if (amount > myTroops) return;
+      this.eventBus.emit(new SendDonateTroopsIntentEvent(target, amount));
+    } else {
+      const rawGold =
+        typeof (myPlayer as any).gold === "function"
+          ? (myPlayer as any).gold()
+          : 0;
+      const myGold = Number(rawGold);
+      if (amount > myGold) return;
+      this.eventBus.emit(new SendDonateGoldIntentEvent(target, BigInt(amount)));
+    }
+
+    this.closeSend();
+    if (e.detail?.closePanel) this.hide();
+  };
 
   private handleEmbargoClick(
     e: Event,
@@ -710,6 +745,10 @@ export class PlayerPanel extends LitElement implements Layer {
       return html``;
     }
     const other = owner as PlayerView;
+    const myGoldRaw =
+      typeof (my as any)?.gold === "function" ? (my as any).gold() : 0n;
+    const myGoldNum = Number(myGoldRaw);
+    const myTroopsNum = Number(my?.troops?.() ?? 0);
 
     return html`
       <style>
@@ -771,6 +810,27 @@ export class PlayerPanel extends LitElement implements Layer {
             >
               <!-- Identity (flag, name, type, traitor, relation) -->
               <div class="mb-1">${this.renderIdentityRow(other, my)}</div>
+
+              ${this.openSend && this.sendTarget
+                ? html`
+                    <send-resource-modal
+                      .open=${this.openSend}
+                      .mode=${this.sendMode}
+                      .total=${this.sendMode === "troops"
+                        ? myTroopsNum
+                        : myGoldNum}
+                      .uiState=${this.uiState}
+                      .myPlayer=${my}
+                      .target=${this.sendTarget}
+                      .gameView=${this.g}
+                      .format=${this.sendMode === "troops"
+                        ? renderTroops
+                        : renderNumber}
+                      @confirm=${this.confirmSend}
+                      @close=${this.closeSend}
+                    ></send-resource-modal>
+                  `
+                : ""}
 
               <ui-divider></ui-divider>
 
