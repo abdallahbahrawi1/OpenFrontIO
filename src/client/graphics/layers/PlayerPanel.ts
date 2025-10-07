@@ -205,7 +205,6 @@ export class PlayerPanel extends LitElement implements Layer {
     e: CustomEvent<{ amount: number; closePanel?: boolean }>,
   ) => {
     const amount = Math.floor(Math.max(0, e.detail?.amount ?? 0));
-
     const myPlayer = this.g.myPlayer();
     const target = this.sendTarget;
     if (!myPlayer || !target || amount <= 0) return;
