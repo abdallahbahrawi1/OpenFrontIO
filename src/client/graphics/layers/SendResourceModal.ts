@@ -5,8 +5,7 @@ import { renderTroops, translateText } from "../../Utils";
 import { UIState } from "../UIState";
 
 @customElement("send-resource-modal")
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-class SendResourceModal extends LitElement {
+export class SendResourceModal extends LitElement {
   @property({ type: Boolean }) open: boolean = false;
   @property({ type: String }) mode: "troops" | "gold" = "troops";
 

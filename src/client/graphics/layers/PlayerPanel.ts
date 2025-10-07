@@ -207,6 +207,7 @@ export class PlayerPanel extends LitElement implements Layer {
     const amount = Math.floor(Math.max(0, e.detail?.amount ?? 0));
     const myPlayer = this.g.myPlayer();
     const target = this.sendTarget;
+
     if (!myPlayer || !target || amount <= 0) return;
 
     if (this.sendMode === "troops") {
@@ -467,31 +468,27 @@ export class PlayerPanel extends LitElement implements Layer {
     return html`
       <div class="mb-1 flex justify-between gap-2">
         <div
-          class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 px-2.5 py-1
-                    text-lg font-semibold text-zinc-100"
+          class="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1
+                    text-base font-semibold text-zinc-200"
         >
           <span class="mr-0.5">💰</span>
-          <span
-            translate="no"
-            class="inline-block w-[45px] text-right text-zinc-50"
-          >
+          <span translate="no" class="inline-block min-w-[45px] text-right">
             ${renderNumber(other.gold() || 0)}
           </span>
-          <span class="opacity-95">${translateText("player_panel.gold")}</span>
+          <span class="opacity-95 whitespace-nowrap"
+            >${translateText("player_panel.gold")}</span
+          >
         </div>
 
         <div
-          class="inline-flex items-center gap-1.5 rounded-full bg-zinc-800 px-2.5 py-1
-                    text-lg font-semibold text-zinc-100"
+          class="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1
+                    text-base font-semibold text-zinc-200"
         >
           <span class="mr-0.5">🛡️</span>
-          <span
-            translate="no"
-            class="inline-block w-[45px] text-right text-zinc-50"
-          >
+          <span translate="no" class="inline-block min-w-[45px] text-right">
             ${renderTroops(other.troops() || 0)}
           </span>
-          <span class="opacity-95"
+          <span class="opacity-95 whitespace-nowrap"
             >${translateText("player_panel.troops")}</span
           >
         </div>
@@ -601,7 +598,7 @@ export class PlayerPanel extends LitElement implements Layer {
     if (this.allianceExpiryText === null) return html``;
     return html`
       <div class="grid grid-cols-[auto,1fr] gap-x-6 gap-y-2 text-base">
-        <div class="font-semibold text-zinc-400">
+        <div class="font-semibold text-zinc-300">
           ${translateText("player_panel.alliance_time_remaining")}
         </div>
         <div class="text-right font-semibold">
@@ -752,13 +749,6 @@ export class PlayerPanel extends LitElement implements Layer {
     const myGoldNum = Number(myGoldRaw);
     const myTroopsNum = Number(my?.troops?.() ?? 0);
 
-    const myGoldRaw =
-      typeof (myPlayer as any)?.gold === "function"
-        ? (myPlayer as any).gold()
-        : 0n;
-    const myGoldNum = Number(myGoldRaw);
-    const myTroopsNum = Number(myPlayer?.troops?.() ?? 0);
-
     return html`
       <style>
         /* Soft glowing ring animation for traitors */
@@ -789,12 +779,11 @@ export class PlayerPanel extends LitElement implements Layer {
 
       <div
         class="fixed inset-0 z-[1001] flex items-center justify-center overflow-auto
-               bg-black/40 backdrop-blur-sm backdrop-brightness-110 pointer-events-auto"
+               bg-black/15 backdrop-blur-sm backdrop-brightness-110 pointer-events-auto"
         @contextmenu=${(e: MouseEvent) => e.preventDefault()}
         @wheel=${(e: MouseEvent) => e.stopPropagation()}
         @click=${() => this.hide()}
       >
-        <!-- Stop clicks inside the panel from closing it -->
         <div
           class="pointer-events-auto max-h-[90vh] overflow-y-auto min-w-[240px] w-auto px-4 py-2"
           @click=${(e: MouseEvent) => e.stopPropagation()}
@@ -808,8 +797,8 @@ export class PlayerPanel extends LitElement implements Layer {
               @click=${this.handleClose}
               class="absolute -top-3 -right-3 flex h-7 w-7 items-center justify-center
                      rounded-full bg-zinc-700 text-white shadow hover:bg-red-500 transition-colors"
-              aria-label=${translateText("player_panel.close") || "Close"}
-              title=${translateText("player_panel.close") || "Close"}
+              aria-label=${translateText("common.close") || "Close"}
+              title=${translateText("common.close") || "Close"}
             >
               ✕
             </button>
