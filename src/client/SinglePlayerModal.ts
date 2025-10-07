@@ -78,6 +78,72 @@ export class SinglePlayerModal extends LitElement {
     this.mapFilter = "all";
   }
 
+  private get selectedDifficultyKey(): string {
+    return (
+      Object.keys(Difficulty).find(
+        (k) =>
+          Difficulty[k as keyof typeof Difficulty] === this.selectedDifficulty,
+      ) ?? ""
+    );
+  }
+
+  private handleBotsChange(e: Event) {
+    const value = parseInt((e.target as HTMLInputElement).value);
+    if (isNaN(value) || value < 0 || value > 400) {
+      return;
+    }
+    this.bots = value;
+  }
+
+  private renderSliderStyles() {
+    return html`
+      <style>
+        /* Quick modern styling */
+        input[type="range"] {
+          width: 100%;
+          accent-color: #60a5fa;
+        } /* Tailwind blue-400 */
+
+        /* Cross-browser polish */
+        :host {
+          --track-h: 6px;
+          --thumb: 16px;
+        }
+        input[type="range"] {
+          background: transparent;
+        }
+        /* WebKit */
+        input[type="range"]::-webkit-slider-runnable-track {
+          height: var(--track-h);
+          background: #2a2a2a;
+          border-radius: 9999px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: var(--thumb);
+          height: var(--thumb);
+          margin-top: calc((var(--track-h) - var(--thumb)) / 2);
+          border-radius: 9999px;
+          background: #60a5fa;
+          border: 2px solid #ffffff55;
+        }
+        /* Firefox */
+        input[type="range"]::-moz-range-track {
+          height: var(--track-h);
+          background: #2a2a2a;
+          border-radius: 9999px;
+        }
+        input[type="range"]::-moz-range-thumb {
+          width: var(--thumb);
+          height: var(--thumb);
+          border-radius: 9999px;
+          background: #60a5fa;
+          border: 2px solid #ffffff55;
+        }
+      </style>
+    `;
+  }
+
   render() {
     return html`
       <div
@@ -86,14 +152,13 @@ export class SinglePlayerModal extends LitElement {
         aria-labelledby="sp-title"
         aria-modal="true"
       >
-        <!-- fancy background -->
         <div
           class="pointer-events-none fixed inset-0 bg-[radial-gradient(1200px_600px_at_60%_-10%,rgba(59,130,246,0.18),transparent),radial-gradient(900px_500px_at_15%_110%,rgba(59,130,246,0.10),transparent)]"
         ></div>
 
         <!-- modal surface -->
         <section
-          class="fixed inset-4 mx-auto flex max-w-[1200px] min-h-[560px] flex-col rounded-2xl border border-white/15 bg-zinc-900/80 backdrop-blur-xl shadow-[0_14px_40px_rgba(0,0,0,0.45)] md:inset-8"
+          class="fixed inset-4 mx-auto flex max-w-[1200px] min-h-[560px] flex-col rounded-2xl border border-white/15 bg-zinc-900/80 backdrop-blur-xl shadow-[0_14px_40px_rgba(0,0,0,0.45)] md:inset-8 text-zinc-100 antialiased"
         >
           <!-- header -->
           <header
@@ -127,7 +192,7 @@ export class SinglePlayerModal extends LitElement {
 
           <!-- body (desktop grid) -->
           <main
-            class="grid flex-1 grid-cols-1 gap-4 overflow-auto p-4 md:grid-cols-[1.2fr_1fr]"
+            class="grid flex-1 min-h-0 grid-cols-1 gap-4 overflow-auto p-4 md:grid-cols-[1.2fr_1fr]"
           >
             <!-- Maps pane (desktop) -->
             <aside
@@ -170,11 +235,32 @@ export class SinglePlayerModal extends LitElement {
                   )}
                   <button
                     id="randomMap"
-                    class="h-9 rounded-full border border-white/15 bg-white/5 px-3 hover:bg-white/10 hover:border-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                    class=${`h-9 rounded-full border px-3 flex items-center gap-1.5 transition-all duration-200 
+                      ${
+                        this.useRandomMap
+                          ? "border-blue-400/60 bg-gradient-to-r from-blue-500/30 to-blue-600/30 text-blue-50 font-medium shadow-[0_0_8px_rgba(59,130,246,0.35)]"
+                          : "border-white/15 bg-white/5 text-zinc-200 hover:bg-gradient-to-r hover:from-blue-500/15 hover:to-blue-600/15 hover:border-blue-400/30"
+                      }
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60`}
                     title=${translateText("map.random")}
+                    aria-pressed=${this.useRandomMap}
                     @click=${this.handleRandomMapToggle}
                   >
-                    🎲 ${translateText("map.random")}
+                    <span
+                      class=${`inline-block transition-transform duration-200 ${this.useRandomMap ? "rotate-[15deg]" : ""}`}
+                    >
+                      🎲
+                    </span>
+                    <span>${translateText("map.random")}</span>
+                    ${this.useRandomMap
+                      ? html`
+                          <span
+                            class="ml-1 inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-400/30 text-xs font-bold"
+                          >
+                            ✓
+                          </span>
+                        `
+                      : ""}
                   </button>
                 </div>
               </div>
@@ -265,9 +351,10 @@ export class SinglePlayerModal extends LitElement {
             </aside>
 
             <!-- Settings pane (desktop) -->
+
             <section
               aria-label="Settings"
-              class="min-h-80 flex-col gap-3 rounded-xl border border-white/15 bg-zinc-900/40 p-3 flex"
+              class="min-h-0 flex flex-col gap-3 rounded-xl border border-white/15 bg-zinc-900/40 p-3 overflow-auto"
             >
               <section
                 class="rounded-xl border border-white/15 bg-white/5 p-4 md:p-5 text-zinc-100"
@@ -330,10 +417,20 @@ export class SinglePlayerModal extends LitElement {
               </section>
 
               <!-- difficulty -->
+
               <div>
-                <label class="mb-1 ml-0.5 block text-xs text-zinc-400">
-                  ${translateText("difficulty.difficulty")}
-                </label>
+                <div class="mb-1 flex items-center justify-between">
+                  <label class="ml-0.5 block text-xs text-zinc-400">
+                    ${translateText("difficulty.difficulty")}
+                  </label>
+
+                  <div class="h-10">
+                    <difficulty-display
+                      .difficultyKey=${this.selectedDifficultyKey}
+                    ></difficulty-display>
+                  </div>
+                </div>
+
                 <div class="flex flex-wrap gap-2">
                   ${Object.entries(Difficulty)
                     .filter(([key]) => isNaN(Number(key)))
@@ -398,21 +495,22 @@ export class SinglePlayerModal extends LitElement {
                   step="1"
                   .value="${String(this.bots)}"
                   @input=${this.handleBotsChange}
-                  class="w-full accent-blue-400"
+                  class="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-blue-400"
+                  style="--range-thumb-bg: #60a5fa; --range-track-bg: #3f3f46;"
                 />
               </div>
 
               <!-- advanced options -->
-              <details
-                class="overflow-hidden rounded-xl border border-white/15"
-              >
+              <details class="rounded-xl border border-white/15">
                 <summary
-                  class="cursor-pointer px-3 py-3 font-semibold hover:bg-white/5 transition-colors"
+                  class="cursor-pointer px-3 py-3 font-semibold hover:bg-white/5 transition-colors text-zinc-100"
                 >
                   ${translateText("single_modal.advanced_options")}
                 </summary>
-                <div class="border-t border-white/15 p-3">
-                  <div class="grid grid-cols-2 gap-2">
+                <div class="border-t border-white/15 p-3 flex flex-col min-h-0">
+                  <div
+                    class="grid grid-cols-2 gap-2 max-h-72 sm:max-h-80 overflow-auto pr-1 [scrollbar-gutter:stable]"
+                  >
                     <label
                       class="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 p-2 hover:bg-white/5 transition-colors"
                     >
@@ -488,7 +586,9 @@ export class SinglePlayerModal extends LitElement {
                     <div class="mb-2 text-center text-xs text-zinc-400">
                       ${translateText("single_modal.enables_title")}
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div
+                      class="grid grid-cols-2 gap-2 max-h-72 sm:max-h-80 overflow-auto pr-1 [scrollbar-gutter:stable]"
+                    >
                       ${renderUnitTypeOptions({
                         disabledUnits: this.disabledUnits,
                         toggleUnit: this.toggleUnit.bind(this),
@@ -510,7 +610,7 @@ export class SinglePlayerModal extends LitElement {
               </label>
               <select
                 id="presetSelect"
-                class="h-11 rounded-xl border border-white/15 bg-zinc-900/60 px-2 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 transition-colors"
+                class="h-11 rounded-xl border border-white/15 bg-zinc-900 px-2 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/70 transition-colors text-zinc-100 appearance-none"
                 .value=${String(this.selectedDifficulty)}
                 @change=${(e: Event) =>
                   this.handleDifficultySelection(
@@ -523,7 +623,7 @@ export class SinglePlayerModal extends LitElement {
                   .filter(([key]) => isNaN(Number(key)))
                   .map(
                     ([key, value]) => html`
-                      <option value=${value}>
+                      <option class="bg-zinc-900 text-zinc-100" value=${value}>
                         ${translateText(`difficulty.${key}`)}
                       </option>
                     `,
@@ -531,7 +631,7 @@ export class SinglePlayerModal extends LitElement {
               </select>
               <button
                 id="resetBtn"
-                class="h-11 rounded-xl border border-white/15 bg-transparent px-3 hover:bg-white/5 hover:border-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+                class="h-11 rounded-xl border border-white/15 bg-transparent px-3 hover:bg-white/5 hover:border-white/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 text-zinc-100"
                 @click=${this.resetSettings}
               >
                 ${translateText("single_modal.reset")}
@@ -548,6 +648,7 @@ export class SinglePlayerModal extends LitElement {
             </div>
           </footer>
         </section>
+        ${this.renderSliderStyles()}
       </div>
     `;
   }
@@ -567,7 +668,7 @@ export class SinglePlayerModal extends LitElement {
   }
 
   private handleRandomMapToggle() {
-    this.useRandomMap = true;
+    this.useRandomMap = !this.useRandomMap;
   }
 
   private handleMapSelection(value: GameMapType) {
@@ -577,14 +678,6 @@ export class SinglePlayerModal extends LitElement {
 
   private handleDifficultySelection(value: Difficulty) {
     this.selectedDifficulty = value;
-  }
-
-  private handleBotsChange(e: Event) {
-    const value = parseInt((e.target as HTMLInputElement).value);
-    if (isNaN(value) || value < 0 || value > 400) {
-      return;
-    }
-    this.bots = value;
   }
 
   private handleInstantBuildChange(e: Event) {
