@@ -48,7 +48,6 @@ import "./SendResourceModal";
 
 @customElement("player-panel")
 export class PlayerPanel extends LitElement implements Layer {
-  static attackBarMode: boolean = false;
   public g: GameView;
   public eventBus: EventBus;
   public emojiTable: EmojiTable;

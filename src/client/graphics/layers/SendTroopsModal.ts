@@ -12,14 +12,11 @@ class SendTroopsModal extends LitElement {
   @property({ type: Boolean }) open: boolean = false;
   @property({ type: Number }) total: number = 0;
   @property({ type: Object }) uiState: UIState | null = null;
-  @property({ type: Boolean }) attackBarMode: boolean = false;
 
   @state()
   private sendTroopsAmount: number = 0;
   @state()
   private selectedPercent: number | null = null;
-  @state()
-  private attackBarModeChecked: boolean = false;
 
   createRenderRoot() {
     return this;
@@ -27,7 +24,6 @@ class SendTroopsModal extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.attackBarModeChecked = !!this.attackBarMode;
     if (
       this.myPlayer &&
       this.uiState &&
@@ -69,14 +65,6 @@ class SendTroopsModal extends LitElement {
 
   private confirmSendTroops() {
     this.dispatchEvent(
-      new CustomEvent("attackBarModeChange", {
-        detail: { enabled: this.attackBarModeChecked },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-
-    this.dispatchEvent(
       new CustomEvent("confirm", {
         detail: {
           amount: this.sendTroopsAmount,
@@ -98,13 +86,7 @@ class SendTroopsModal extends LitElement {
   };
 
   render() {
-    if (
-      !this.myPlayer ||
-      !this.troopsTarget ||
-      !this.open ||
-      this.attackBarMode
-    )
-      return html``;
+    if (!this.myPlayer || !this.troopsTarget || !this.open) return html``;
 
     const minKeepAbs = Math.floor(this.total * 0.3);
     const maxAmount = this.total;
@@ -141,7 +123,7 @@ class SendTroopsModal extends LitElement {
           @keydown=${this.handleKeydown}
         >
           <div
-            class="rounded-2xl bg-zinc-900 p-5 shadow-2xl ring-1 ring-white/10 max-h-[90vh]"
+            class="rounded-2xl bg-zinc-900 p-5 shadow-2xl ring-1 ring-zinc-800 max-h-[90vh] text-zinc-200"
           >
             <!-- Header -->
             <div class="mb-3 flex items-center justify-between">
@@ -149,30 +131,31 @@ class SendTroopsModal extends LitElement {
                 id="send-troops-title"
                 class="text-lg font-semibold tracking-tight text-zinc-100"
               >
-                ${translateText("send_troops_modal.title")} →
-                ${this.troopsTarget?.name()}
+                ${translateText("send_troops_modal.title", {
+                  name: this.troopsTarget?.name() ?? "",
+                })}
               </h2>
               <button
-                class="rounded-md px-2 text-2xl leading-none text-zinc-400 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-white/20"
+                class="rounded-md px-2 text-2xl leading-none text-zinc-300 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-white/30"
                 @click=${() => this.closeTroopsModal()}
-                aria-label="Close"
+                aria-label=${translateText("common.close")}
               >
                 ×
               </button>
             </div>
 
             <div
-              class="mb-4 pb-3 text-xs text-zinc-400 border-b border-white/10"
+              class="mb-4 pb-3 text-sm text-zinc-300 border-b border-zinc-800"
             >
               ${translateText("send_troops_modal.available")}
-              <span class="font-medium font-mono text-zinc-200"
+              <span class="font-medium font-mono text-zinc-100"
                 >${renderTroops(this.total)}</span
               >
               · ${translateText("send_troops_modal.min_keep")}
-              <span class="font-medium font-mono text-zinc-200"
+              <span class="font-medium font-mono text-zinc-100"
                 >${renderTroops(minKeepAbs)}</span
               >
-              (30%)
+              ${translateText("send_troops_modal.min_keep_pct")}
             </div>
 
             <!-- Preset chips -->
@@ -182,13 +165,15 @@ class SendTroopsModal extends LitElement {
                 return html` <button
                   class="rounded-lg px-3 py-2 text-sm ring-1 transition
                   ${(this.selectedPercent ?? percent) === val
-                    ? "bg-indigo-600 text-white ring-indigo-400/40"
-                    : "bg-zinc-800/60 text-zinc-300 ring-white/10 hover:bg-zinc-800 hover:text-white"}"
-                  @click=${() => setByPercent(val)}
+                    ? "bg-indigo-600 text-white ring-indigo-300/60"
+                    : "bg-zinc-800 text-zinc-200 ring-zinc-700 hover:bg-zinc-700 hover:text-zinc-50"}"
+                  @click=${() => setByPercent(p)}
                   ?aria-pressed=${(this.selectedPercent ?? percent) === val}
                   title="${val}%"
                 >
-                  ${p === "Max" ? "Max" : `${p}%`}
+                  ${p === "Max"
+                    ? translateText("send_troops_modal.preset_max")
+                    : `${p}%`}
                 </button>`;
               })}
             </div>
@@ -216,7 +201,7 @@ class SendTroopsModal extends LitElement {
                   style="
                   --percent:${percent}%;
                   --fill: rgb(168 85 247);
-                  --track: rgba(255,255,255,.22);
+                  --track: rgba(255,255,255,.28);
                   --thumb-ring: rgb(24 24 27);
                   "
                 />
@@ -226,7 +211,7 @@ class SendTroopsModal extends LitElement {
                   style="left:${percent}%"
                 >
                   <div
-                    class="rounded bg-[#0f1116] ring-1 text-[#e8ebf0] ring-white/10
+                    class="rounded bg-[#0f1116] ring-1 ring-zinc-700 text-zinc-100
                         px-1.5 py-0.5 text-[12px] shadow whitespace-nowrap w-max z-50"
                   >
                     ${percent}% • ${renderTroops(this.sendTroopsAmount)}
@@ -261,48 +246,12 @@ class SendTroopsModal extends LitElement {
               </span>
             </div>
 
-            <!-- Preference toggle -->
-            <label
-              class="mt-3 flex items-center gap-[10px] text-[var(--muted)] text-[13px] select-none"
-            >
-              <input
-                type="checkbox"
-                id="attackbar-toggle"
-                class="h-4 w-4 rounded accent-[var(--purple)] cursor-pointer"
-                .checked=${this.attackBarModeChecked}
-                @change=${(e: Event) => {
-                  this.attackBarModeChecked = (
-                    e.target as HTMLInputElement
-                  ).checked;
-                }}
-              />
-              <span
-                >${translateText(
-                  "send_troops_modal.toggle_attack_bar_mode",
-                )}</span
-              >
-            </label>
-
-            <!-- Warning -->
-            ${this.attackBarModeChecked
-              ? html`
-                  <div
-                    id="warn-row"
-                    role="alert"
-                    aria-live="polite"
-                    class="mt-[10px] bg-[rgba(255,90,103,0.08)] border border-[var(--danger)] text-[#ffc9ce] py-2.5 px-3 rounded-[10px] text-[13px]"
-                  >
-                    ⚠ ${translateText("send_troops_modal.warning_attackbar")}
-                  </div>
-                `
-              : null}
-
             <!-- Actions -->
             <div class="mt-5 flex justify-end gap-2">
               <button
                 class="h-10 min-w-24 rounded-lg px-3 text-sm font-semibold
-                  text-zinc-100 bg-zinc-800/70 ring-1 ring-white/10
-                  hover:bg-zinc-800 focus:outline-none
+                  text-zinc-100 bg-zinc-800 ring-1 ring-zinc-700
+                  hover:bg-zinc-700 focus:outline-none
                     focus-visible:ring-2 focus-visible:ring-white/20"
                 @click=${() => this.closeTroopsModal()}
               >
