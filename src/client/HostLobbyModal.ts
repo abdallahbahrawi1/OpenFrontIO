@@ -1,6 +1,5 @@
 import { LitElement, html } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import randomMap from "../../resources/images/RandomMap.webp";
 import { translateText } from "../client/Utils";
 import { getServerConfigFromClient } from "../core/configuration/ConfigLoader";
 import {
@@ -12,7 +11,6 @@ import {
   Quads,
   Trios,
   UnitType,
-  mapCategories,
 } from "../core/game/Game";
 import { UserSettings } from "../core/game/UserSettings";
 import {
@@ -25,6 +23,9 @@ import { generateID } from "../core/Util";
 import "./components/baseComponents/Modal";
 import "./components/Difficulties";
 import "./components/Maps";
+import "./components/shared/DifficultyPicker";
+import "./components/shared/GameModePicker";
+import "./components/shared/MapGrid";
 import { JoinLobbyEvent } from "./Main";
 import { renderUnitTypeOptions } from "./utilities/RenderUnitTypeOptions";
 
@@ -166,87 +167,20 @@ export class HostLobbyModal extends LitElement {
         <div class="options-layout">
           <!-- Map Selection -->
           <div class="options-section">
-            <div class="option-title">${translateText("map.map")}</div>
-            <div class="option-cards flex-col">
-              <!-- Use the imported mapCategories -->
-              ${Object.entries(mapCategories).map(
-                ([categoryKey, maps]) => html`
-                  <div class="w-full mb-4">
-                    <h3
-                      class="text-lg font-semibold mb-2 text-center text-gray-300"
-                    >
-                      ${translateText(`map_categories.${categoryKey}`)}
-                    </h3>
-                    <div class="flex flex-row flex-wrap justify-center gap-4">
-                      ${maps.map((mapValue) => {
-                        const mapKey = Object.keys(GameMapType).find(
-                          (key) =>
-                            GameMapType[key as keyof typeof GameMapType] ===
-                            mapValue,
-                        );
-                        return html`
-                          <div
-                            @click=${() => this.handleMapSelection(mapValue)}
-                          >
-                            <map-display
-                              .mapKey=${mapKey}
-                              .selected=${!this.useRandomMap &&
-                              this.selectedMap === mapValue}
-                              .translation=${translateText(
-                                `map.${mapKey?.toLowerCase()}`,
-                              )}
-                            ></map-display>
-                          </div>
-                        `;
-                      })}
-                    </div>
-                  </div>
-                `,
-              )}
-              <div
-                class="option-card random-map ${
-                  this.useRandomMap ? "selected" : ""
-                }"
-                @click=${this.handleRandomMapToggle}
-              >
-                <div class="option-image">
-                  <img
-                    src=${randomMap}
-                    alt="Random Map"
-                    style="width:100%; aspect-ratio: 4/2; object-fit:cover; border-radius:8px;"
-                  />
-                </div>
-                <div class="option-card-title">
-                  ${translateText("map.random")}
-                </div>
-              </div>
-            </div>
+            <div class="option-title">${translateText("difficulty.difficulty")}</div>
+            <of-difficulty-picker
+              .value=${this.selectedDifficulty}
+              @change=${(e: CustomEvent<{ value: Difficulty }>) => this.handleDifficultySelection(e.detail.value)}
+            ></of-difficulty-picker>
           </div>
 
           <!-- Difficulty Selection -->
           <div class="options-section">
-            <div class="option-title">${translateText("difficulty.difficulty")}</div>
-            <div class="option-cards">
-              ${Object.entries(Difficulty)
-                .filter(([key]) => isNaN(Number(key)))
-                .map(
-                  ([key, value]) => html`
-                    <div
-                      class="option-card ${this.selectedDifficulty === value
-                        ? "selected"
-                        : ""}"
-                      @click=${() => this.handleDifficultySelection(value)}
-                    >
-                      <difficulty-display
-                        .difficultyKey=${key}
-                      ></difficulty-display>
-                      <p class="option-card-title">
-                        ${translateText(`difficulty.${key}`)}
-                      </p>
-                    </div>
-                  `,
-                )}
-            </div>
+            <div class="option-title">${translateText("host_modal.mode")}</div>
+            <of-game-mode-picker
+              .value=${this.gameMode}
+              @change=${(e: CustomEvent<{ value: GameMode }>) => this.handleGameModeSelection(e.detail.value)}
+            ></of-game-mode-picker>
           </div>
 
           <!-- Game Mode Selection -->

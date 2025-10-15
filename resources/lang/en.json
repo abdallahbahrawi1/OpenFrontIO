@@ -125,6 +125,8 @@
   },
   "single_modal": {
     "title": "Single Player",
+    "rules": "Rules",
+    "units_and_buildings": "Units & Buildings",
     "allow_alliances": "Allow alliances",
     "options_title": "Options",
     "bots": "Bots: ",

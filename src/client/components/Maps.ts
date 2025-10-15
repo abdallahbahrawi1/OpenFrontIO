@@ -1,4 +1,4 @@
-import { LitElement, html } from "lit";
+import { LitElement, PropertyValues, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { GameMapType } from "../../core/game/Game";
 import { terrainMapFileLoader } from "../TerrainMapFileLoader";
@@ -47,9 +47,17 @@ export class MapDisplay extends LitElement {
   @state() private mapName: string | null = null;
   @state() private isLoading = true;
 
+  private _loadToken = 0;
+
   connectedCallback() {
     super.connectedCallback();
     this.loadMapData();
+  }
+
+  protected updated(changed: PropertyValues) {
+    if (changed.has("mapKey")) {
+      this.loadMapData();
+    }
   }
 
   createRenderRoot() {
@@ -59,12 +67,23 @@ export class MapDisplay extends LitElement {
   private async loadMapData() {
     if (!this.mapKey) return;
 
+    const myToken = ++this._loadToken;
+    this.isLoading = true;
+    this.mapWebpPath = null;
+
     try {
-      this.isLoading = true;
       const mapValue = GameMapType[this.mapKey as keyof typeof GameMapType];
       const data = terrainMapFileLoader.getMapData(mapValue);
-      this.mapWebpPath = await data.webpPath();
-      this.mapName = (await data.manifest()).name;
+      const [webpPath, manifest] = await Promise.all([
+        data.webpPath(),
+        data.manifest(),
+      ]);
+
+      // if another load started after this one, ignore this result
+      if (myToken !== this._loadToken) return;
+
+      this.mapWebpPath = webpPath;
+      this.mapName = manifest.name;
     } catch (error) {
       console.error("Failed to load map data:", error);
     } finally {

@@ -1,4 +1,3 @@
-// utilities/RenderUnitTypeOptions.ts
 import { html, TemplateResult } from "lit";
 import { UnitType } from "../../core/game/Game";
 import { translateText } from "../Utils";
@@ -26,7 +25,7 @@ export function renderUnitTypeOptions({
   toggleUnit,
 }: UnitTypeRenderContext): TemplateResult[] {
   return unitOptions.map(({ type, translationKey }) => {
-    const isDisabled = disabledUnits.includes(type);
+    const isOn = !disabledUnits.includes(type);
 
     const cardClasses = [
       "group",
@@ -41,11 +40,9 @@ export function renderUnitTypeOptions({
       "justify-between",
       "gap-3",
       "transition-colors",
-      "focus-within:ring-2",
-      "focus-within:ring-blue-400/60",
-      isDisabled
-        ? "border-rose-400/40 bg-rose-500/10 text-rose-50 shadow-[0_0_8px_rgba(244,63,94,0.25)]"
-        : "border-white/15 bg-white/5 text-zinc-200 hover:border-white/25",
+      isOn
+        ? "border-emerald-400/40 bg-transparent text-zinc-100"
+        : "border-white/15 bg-transparent text-zinc-200 hover:border-white/25 hover:bg-white/5",
     ].join(" ");
 
     const chipClasses = [
@@ -55,11 +52,11 @@ export function renderUnitTypeOptions({
       "border",
       "px-2",
       "py-0.5",
-      "text-xs",
+      "text-sm",
       "font-semibold",
-      isDisabled
-        ? "border-rose-400/30 bg-rose-400/20 text-rose-100"
-        : "border-emerald-400/30 bg-emerald-400/15 text-emerald-100",
+      isOn
+        ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-100"
+        : "border-rose-400/30 bg-rose-400/20 text-rose-100",
     ].join(" ");
 
     return html`
@@ -67,8 +64,8 @@ export function renderUnitTypeOptions({
         <div class="flex items-center gap-3">
           <input
             type="checkbox"
-            class="h-4 w-4 accent-blue-400"
-            .checked=${isDisabled}
+            class="h-4 w-4 accent-blue-400 focus-visible:outline-none"
+            .checked=${isOn}
             @change=${(e: Event) => {
               const checked = (e.target as HTMLInputElement).checked;
               toggleUnit(type, checked);
@@ -81,7 +78,7 @@ export function renderUnitTypeOptions({
         </div>
 
         <span class="${chipClasses}" aria-hidden="true">
-          ${isDisabled ? "Off" : "On"}
+          ${isOn ? "On" : "Off"}
         </span>
       </label>
     `;

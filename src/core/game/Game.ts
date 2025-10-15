@@ -177,6 +177,14 @@ export enum UnitType {
   Factory = "Factory",
 }
 
+export enum GameRuleType {
+  disableNPCs = "Disable NPCs",
+  instantBuild = "Instant Build",
+  infiniteGold = "Infinite Gold",
+  infiniteTroops = "Infinite Troops",
+  compactMap = "Compact Map",
+}
+
 export enum TrainType {
   Engine = "Engine",
   Carriage = "Carriage",
