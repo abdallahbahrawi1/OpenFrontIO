@@ -89,6 +89,7 @@ export class HostLobbyModal extends LitElement {
   @state() private presetError: string = "";
 
   @state() private inviteExpanded = false;
+  @state() private rightExpanded = false;
 
   private playersInterval: NodeJS.Timeout | null = null;
   // Add a new timer for debouncing bot changes
@@ -124,6 +125,51 @@ export class HostLobbyModal extends LitElement {
       disabledUnits: [...this.disabledUnits],
     };
   }
+
+  private getInviteUrl(): string {
+    // Pick the canonical deep link for your app here.
+    // If you later wire a /join/:id route, flip the constant below.
+    const USE_PATH_ROUTE = false; // set to true if you add /join/<id>
+    const id = this.lobbyId?.trim();
+    if (!id) return "";
+
+    const base = location.origin;
+
+    if (USE_PATH_ROUTE) {
+      return `${base}/join/${encodeURIComponent(id)}`;
+    }
+
+    // Default SPA hash deep link (works with your existing "#join=" handler)
+    const u = new URL(base);
+    u.hash = `join=${encodeURIComponent(id)}`;
+    return u.toString();
+  }
+
+  private toggleInviteVisibility = () => {
+    this.lobbyIdVisible = !this.lobbyIdVisible;
+    // keep user choice persistent (you already read it in open())
+    this.userSettings.set("settings.lobbyIdVisibility", this.lobbyIdVisible);
+  };
+
+  private copyInviteUrl = async () => {
+    try {
+      const url = this.getInviteUrl();
+      if (!url) return;
+      await navigator.clipboard.writeText(url);
+      this.copySuccess = true;
+      setTimeout(() => (this.copySuccess = false), 1600);
+    } catch (err) {
+      console.error("Failed to copy invite:", err);
+    }
+  };
+
+  private toggleRightExpanded = () => {
+    this.rightExpanded = !this.rightExpanded;
+  };
+
+  private toggleInviteExpanded = () => {
+    this.inviteExpanded = !this.inviteExpanded;
+  };
 
   private applySettings(s: HostLobbyPreset["settings"]) {
     // set all state first…
@@ -241,6 +287,210 @@ export class HostLobbyModal extends LitElement {
       this.close();
     }
   };
+
+  // (A) Just the invite content (no sticky wrapper)
+  private renderInviteBarInner() {
+    const actualUrl = this.getInviteUrl();
+    const masked = "••••••••••••••••••••";
+    const displayValue = this.lobbyId
+      ? this.lobbyIdVisible
+        ? actualUrl
+        : masked
+      : (translateText("host_modal.generating") ?? "Generating…");
+
+    return html`
+      <div
+        class="rounded-xl border border-white/15 bg-zinc-900/70 backdrop-blur px-2 py-2 flex items-center gap-2"
+      >
+        <!-- URL field -->
+        <div class="relative flex-1">
+          <input
+            class="h-10 w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 pr-24 text-zinc-100 placeholder:text-zinc-400
+                 outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+            type="text"
+            .value=${displayValue}
+            readonly
+            @focus=${(e: Event) => (e.target as HTMLInputElement).select()}
+          />
+          <!-- Eye toggle -->
+          <button
+            class="absolute right-2 top-1.5 h-7 w-7 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 text-zinc-200"
+            @click=${this.toggleInviteVisibility}
+            title=${this.lobbyIdVisible
+              ? "Hide invite link"
+              : "Show invite link"}
+            aria-label="Toggle invite visibility"
+            aria-pressed=${String(this.lobbyIdVisible)}
+          >
+            ${this.lobbyIdVisible
+              ? html`<svg
+                  viewBox="0 0 512 512"
+                  height="18"
+                  width="18"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M256 105c-101.8 0-188.4 62.7-224 151 35.6 88.3 122.2 151 224 151s188.4-62.7 224-151c-35.6-88.3-122.2-151-224-151zm0 251.7c-56 0-101.7-45.7-101.7-101.7S200 153.3 256 153.3 357.7 199 357.7 255 312 356.7 256 356.7zm0-161.1c-33 0-59.4 26.4-59.4 59.4s26.4 59.4 59.4 59.4 59.4-26.4 59.4-59.4-26.4-59.4-59.4-59.4z"
+                  ></path>
+                </svg>`
+              : html`<svg
+                  viewBox="0 0 512 512"
+                  height="18"
+                  width="18"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M448 256s-64-128-192-128S64 256 64 256c32 64 96 128 192 128s160-64 192-128z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="32"
+                  ></path>
+                  <path
+                    d="M144 256l224 0"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="32"
+                    stroke-linecap="round"
+                  ></path>
+                </svg>`}
+          </button>
+        </div>
+
+        <!-- Copy -->
+        <button
+          class="h-10 whitespace-nowrap rounded-lg border border-emerald-500/40 bg-emerald-600/20 px-3 font-medium text-emerald-50
+               hover:bg-emerald-600/30 disabled:opacity-50"
+          @click=${this.copyInviteUrl}
+          ?disabled=${!this.lobbyId}
+        >
+          ${this.copySuccess ? "Copied" : "Copy invite"}
+        </button>
+      </div>
+    `;
+  }
+
+  // (B) Sticky top wrapper that contains the expand button row AND the invite bar
+  private renderRightTopControls() {
+    return html`
+      <div class="sticky top-0 z-20 bg-transparent">
+        <div class="flex items-center gap-2 pb-2">
+          <div class="flex-1">${this.renderInviteBarInner()}</div>
+          ${this.renderRightExpandButton(true)}
+        </div>
+      </div>
+    `;
+  }
+
+  // 1) Mode toggle (FFA | Teams)
+  private renderModeToggle() {
+    const on = "bg-blue-500/25 text-blue-50 border border-blue-400/50";
+    const off =
+      "bg-white/5 text-zinc-200 hover:bg-white/10 border border-white/15";
+    const btn =
+      "h-10 px-4 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
+
+    return html`
+      <label class="mb-1 ml-0.5 block text-xs text-zinc-400">
+        ${translateText("host_modal.mode")}
+      </label>
+      <div class="inline-flex overflow-hidden rounded-xl">
+        <button
+          class="${btn} ${this.gameMode === GameMode.FFA ? on : off}"
+          aria-pressed=${String(this.gameMode === GameMode.FFA)}
+          @click=${() => this.handleGameModeSelection(GameMode.FFA)}
+        >
+          ${translateText("game_mode.ffa")}
+        </button>
+        <button
+          class="${btn} ${this.gameMode === GameMode.Team ? on : off}"
+          aria-pressed=${String(this.gameMode === GameMode.Team)}
+          @click=${() => this.handleGameModeSelection(GameMode.Team)}
+        >
+          ${translateText("game_mode.teams")}
+        </button>
+      </div>
+    `;
+  }
+
+  // 2) Team options (only visible when Teams is selected)
+  private renderTeamOptionsIfTeams() {
+    if (this.gameMode !== GameMode.Team) return null;
+
+    const numbers: TeamCountConfig[] = [2, 3, 4, 5, 6, 7];
+    const named: TeamCountConfig[] = [Duos, Trios, Quads];
+
+    const group =
+      "inline-flex items-center overflow-hidden rounded-xl border border-white/15 bg-white/5 backdrop-blur";
+    const btn =
+      "h-9 px-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60";
+    const on = "border border-emerald-500/40 bg-emerald-600/20 text-emerald-50";
+    const off = "text-zinc-200 hover:bg-white/10";
+
+    const isSel = (v: TeamCountConfig) => this.teamCount === v;
+
+    return html`
+      <div class="mt-3">
+        <label class="mb-1 ml-0.5 block text-xs text-zinc-400">
+          ${translateText("host_modal.team_count")}
+        </label>
+        <div class="flex flex-wrap gap-2" role="group" aria-label="Teams">
+          <!-- 2..7 -->
+          <div class=${group}>
+            ${numbers.map(
+              (n) => html`
+                <button
+                  class="${btn} ${isSel(n) ? on : off}"
+                  aria-pressed=${String(isSel(n))}
+                  @click=${() => this.handleTeamCountSelection(n)}
+                >
+                  ${n}
+                </button>
+              `,
+            )}
+          </div>
+          <!-- Duos/Trios/Quads -->
+          <div class=${group}>
+            ${named.map(
+              (v) => html`
+                <button
+                  class="${btn} ${isSel(v) ? on : off}"
+                  aria-pressed=${String(isSel(v))}
+                  @click=${() => this.handleTeamCountSelection(v)}
+                >
+                  ${translateText(`public_lobby.teams_${v}`)}
+                </button>
+              `,
+            )}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ⬇️ Not absolute anymore; it's a normal row we can place anywhere.
+  private renderRightExpandButton(inline = false) {
+    const label = this.rightExpanded
+      ? (translateText("host_modal.collapse_panel") ?? "Collapse panel")
+      : (translateText("host_modal.expand_panel") ?? "Expand panel");
+
+    const btn = html`
+      <button
+        class="h-10 px-3 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-zinc-200
+             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+        @click=${this.toggleRightExpanded}
+        aria-pressed=${String(this.rightExpanded)}
+        aria-label=${label}
+        title=${label}
+      >
+        ${this.rightExpanded ? "⤡" : "⤢"}
+        <span class="hidden sm:inline">${label}</span>
+      </button>
+    `;
+
+    return inline
+      ? btn
+      : html`<div class="mb-2 flex items-center justify-end">${btn}</div>`;
+  }
 
   private renderPresetsFooter() {
     return html`
@@ -790,8 +1040,9 @@ export class HostLobbyModal extends LitElement {
         aria-label="Settings"
         class="min-h-0 flex flex-col gap-3 rounded-xl border border-white/15 bg-zinc-900/40 p-3 overflow-auto"
       >
-        ${this.renderSettingsSummary()} ${this.renderDifficultyControls()}
-        ${this.renderModeControls()} ${this.renderBotsSlider()}
+        ${this.renderRightTopControls()} ${this.renderSettingsSummary()}
+        ${this.renderDifficultyControls()} ${this.renderModeToggle()}
+        ${this.renderTeamOptionsIfTeams()} ${this.renderBotsSlider()}
         ${this.renderAdvancedOptions()}
 
         <!-- Host-only: players + start button -->
@@ -885,26 +1136,14 @@ export class HostLobbyModal extends LitElement {
             </div>
           </header>
 
-          <!-- lobby id row (host-only) -->
-          <div
-            class="px-4 py-2 border-b border-white/10 flex items-center gap-2"
-          >
-            <!-- reuse your exact lobby id UI -->
-            ${/* keep your existing SVG/buttons/snippets here unchanged */ ""}
-            ${(() => html`
-              <button class="lobby-id-button">
-                ${
-                  /* (paste your visibility / copy block markup here verbatim) */ ""
-                }
-              </button>
-            `)()}
-          </div>
-
           <!-- body -->
           <main
-            class="grid flex-1 min-h-0 grid-cols-1 gap-4 overflow-auto p-4 md:grid-cols-[1.2fr_1fr]"
+            class=${`grid flex-1 min-h-0 grid-cols-1 gap-4 overflow-auto p-4 ${
+              this.rightExpanded ? "md:grid-cols-1" : "md:grid-cols-[1.2fr_1fr]"
+            }`}
           >
-            ${this.renderMapsPane()} ${this.renderSettingsPane()}
+            ${this.rightExpanded ? null : this.renderMapsPane()}
+            ${this.renderSettingsPane()}
           </main>
 
           ${this.renderPresetsFooter()}
@@ -926,10 +1165,13 @@ export class HostLobbyModal extends LitElement {
       true,
     );
 
-    createLobby(this.lobbyCreatorClientID)
+    const preId = generateID();
+    this.lobbyId = preId; // <- show URL immediately
+
+    createLobby(this.lobbyCreatorClientID, preId)
       .then((lobby) => {
-        this.lobbyId = lobby.gameID;
-        // join lobby
+        // keep server's id if it echoes back (should match preId)
+        this.lobbyId = lobby.gameID || preId;
       })
       .then(() => {
         this.dispatchEvent(
@@ -942,9 +1184,10 @@ export class HostLobbyModal extends LitElement {
             composed: true,
           }),
         );
-      });
+      })
+      .catch((err) => console.error("Error creating lobby:", err));
 
-    this.style.display = "block";
+    this.modalEl?.open();
     this.playersInterval = setInterval(() => this.pollPlayers(), 1000);
   }
 
@@ -1158,33 +1401,23 @@ export class HostLobbyModal extends LitElement {
   }
 }
 
-async function createLobby(creatorClientID: string): Promise<GameInfo> {
+async function createLobby(
+  creatorClientID: string,
+  id?: string,
+): Promise<GameInfo> {
   const config = await getServerConfigFromClient();
-  try {
-    const id = generateID();
-    const response = await fetch(
-      `/${config.workerPath(id)}/api/create_game/${id}?creatorClientID=${encodeURIComponent(creatorClientID)}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // body: JSON.stringify(data), // Include this if you need to send data
-      },
-    );
+  const lobbyId = id ?? generateID(); // use provided id if present
+  const response = await fetch(
+    `/${config.workerPath(lobbyId)}/api/create_game/${encodeURIComponent(lobbyId)}?creatorClientID=${encodeURIComponent(creatorClientID)}`,
+    { method: "POST", headers: { "Content-Type": "application/json" } },
+  );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Server error response:", errorText);
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log("Success:", data);
-
-    return data as GameInfo;
-  } catch (error) {
-    console.error("Error creating lobby:", error);
-    throw error;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Server error response:", errorText);
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
+
+  const data = await response.json();
+  return data as GameInfo;
 }
