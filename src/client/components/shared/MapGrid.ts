@@ -18,6 +18,11 @@ export class OfMapGrid extends LitElement {
     return this;
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    this.style.display = "contents";
+  }
+
   private select(value: GameMapType) {
     this.dispatchEvent(
       new CustomEvent("map-select", {
