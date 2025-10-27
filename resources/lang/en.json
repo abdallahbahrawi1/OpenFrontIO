@@ -8,7 +8,9 @@
   "common": {
     "all": "All",
     "close": "Close",
-    "search": "Search..."
+    "search": "Search...",
+    "expand_panel": "Expand",
+    "collapse_panel": "Collapse"
   },
   "main": {
     "title": "OpenFront (ALPHA)",
@@ -122,6 +124,10 @@
     "icon_request": "Envelope - Alliance request. This player has sent you an alliance request.",
     "info_enemy_panel": "Enemy info panel",
     "exit_confirmation": "Are you sure you want to exit the game?"
+  },
+  "settings_summary": {
+    "mode": "Mode",
+    "bots": "Bots: "
   },
   "single_modal": {
     "title": "Single Player",

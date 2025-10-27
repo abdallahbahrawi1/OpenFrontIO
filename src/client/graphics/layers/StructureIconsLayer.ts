@@ -1,6 +1,6 @@
+import { OutlineFilter } from "@pixi/filter-outline";
 import { extend } from "colord";
 import a11yPlugin from "colord/plugins/a11y";
-import { OutlineFilter } from "pixi-filters";
 import * as PIXI from "pixi.js";
 import bitmapFont from "../../../../resources/fonts/round_6x6_modified.xml";
 import anchorIcon from "../../../../resources/images/AnchorIcon.png";
@@ -252,10 +252,10 @@ export class StructureIconsLayer implements Layer {
       render.dotContainer.alpha = structureInfos.visible ? 1 : 0.3;
       if (structureInfos.visible && focusStructure) {
         render.iconContainer.filters = [
-          new OutlineFilter({ thickness: 2, color: "rgb(255, 255, 255)" }),
+          new OutlineFilter(2, 0xffffff) as unknown as PIXI.Filter,
         ];
         render.dotContainer.filters = [
-          new OutlineFilter({ thickness: 2, color: "rgb(255, 255, 255)" }),
+          new OutlineFilter(2, 0xffffff) as unknown as PIXI.Filter,
         ];
       } else {
         render.iconContainer.filters = [];

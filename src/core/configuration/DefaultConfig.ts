@@ -395,12 +395,14 @@ export class DefaultConfig implements Config {
     numTradeShips: number,
     numPlayerTradeShips: number,
   ): number {
-    if (numPlayerTradeShips < 3) {
-      // If other players have many ports, then they can starve out smaller players.
-      // So this prevents smaller players from being completely starved out.
-      return 1;
-    }
+    // Provide assistance to players with few trade ships without guaranteeing spawns.
+    // For players with <3 trade ships, use a gentler decay so their odds degrade more slowly
+    // as the global number of trade ships increases, but still respond to congestion.
     const decayRate = Math.LN2 / 10;
+    if (numPlayerTradeShips < 3) {
+      const smallPlayerDecay = Math.LN2 / 20; // half the decay rate for small players
+      return 1 - sigmoid(numTradeShips, smallPlayerDecay, 55);
+    }
     return 1 - sigmoid(numTradeShips, decayRate, 55);
   }
 
